@@ -1,0 +1,339 @@
+html {
+    min-height: 100%;
+}
+
+:root {
+    --color-0: linear-gradient(to bottom, #ff4500, #f03000);
+    --color-1: linear-gradient(to bottom, #404040, #1a1a1a);
+    --color-2: linear-gradient(to bottom, #007f80, #007070);
+    --color-3: linear-gradient(to bottom, #393092, #30287b);
+    --color-4: linear-gradient(to bottom, #00aeef, #009dd6);
+    --color-5: linear-gradient(to bottom, #87179d, #6e1381);
+}
+
+body {
+    font-family: 微软雅黑, "Avenir", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-align: center;
+    color: #2c3e50;
+    margin-top: 30px;
+}
+
+#app {
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+.el-scrollbar:hover:after {
+    opacity: 1;
+}
+
+.el-scrollbar:after {
+    content: "";
+    position: absolute;
+    height: 18px;
+    pointer-events: none;
+    display: block;
+    width: 100%;
+    bottom: 0;
+    opacity: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.1), transparent);
+    transition: opacity 0.2s ease;
+    border-radius: 0 0 6px 6px;
+}
+
+.card-header {
+    font-size: 18px;
+    font-weight: bold;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    margin-bottom: 10px;
+    color: white;
+    height: 2.4em;
+    border-radius: 6px;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05), 0 2px 2px -1px rgba(0, 0, 0, 0.2);
+    padding: 4px 0.5em 0;
+    position: relative;
+}
+
+#app > section > main > div > div:nth-child(6n+1) > div > div > div.card-header {
+    background: var(--color-0);
+}
+
+#app > section > main > div > div:nth-child(6n+2) > div > div > div.card-header {
+    background: var(--color-1);
+}
+
+#app > section > main > div > div:nth-child(6n+3) > div > div > div.card-header {
+    background: var(--color-2);
+}
+
+#app > section > main > div > div:nth-child(6n+4) > div > div > div.card-header {
+    background: var(--color-3);
+}
+
+#app > section > main > div > div:nth-child(6n+5) > div > div > div.card-header {
+    background: var(--color-4);
+}
+
+#app > section > main > div > div:nth-child(6n) > div > div > div.card-header {
+    background: var(--color-5);
+}
+
+.card-header > time {
+    display: block;
+    position: absolute;
+    font-size: 10px;
+    top: 28px;
+    color: #dfdfdf;
+}
+
+.list-item {
+    display: flex;
+    align-items: center;
+    text-align: left;
+    width: 100%;
+}
+
+.list-item-title {
+    display: block;
+    overflow: hidden;
+    text-align: left;
+    margin-bottom: 8px;
+    cursor: pointer;
+    color: #0060a0;
+    text-decoration: none;
+    padding: 0 0.5em;
+    position: relative;
+}
+
+.list-item-title::before {
+    content: "· ";
+    position: absolute;
+    margin-left: -1rem;
+    color: #0060a0;
+    cursor: pointer;
+}
+
+.title-link {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+}
+
+a {
+    color: black;
+    text-decoration: none;
+}
+
+.feed-col {
+    margin-bottom: 20px;
+}
+
+.el-card.is-always-shadow {
+    box-shadow: none;
+}
+
+.el-card {
+    border: none;
+    background: none;
+}
+
+.el-link__inner {
+    display: inline;
+    color: #0060a0;
+    padding-left: .6em;
+}
+
+* {
+    transition: .2s ease-out;
+}
+
+*:hover {
+    text-decoration: none;
+}
+
+.el-card__body {
+    padding: 0;
+}
+
+.el-link:hover {
+    transform: translateX(4px);
+    color: #b03000
+}
+
+.el-link.is-underline:hover:after {
+    border: none;
+}
+
+@media (prefers-color-scheme: dark) {
+    body {
+        font-family: 微软雅黑, "Avenir", Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-align: center;
+        color: #2c3e50;
+        margin-top: 30px;
+        background: rgb(20, 29, 43);
+    }
+
+    #app {
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+
+    .el-header {
+        color: rgb(159, 239, 0);
+    }
+
+    .el-scrollbar:hover:after {
+        opacity: 1;
+    }
+
+    .el-scrollbar:after {
+        content: "";
+        position: absolute;
+        height: 18px;
+        pointer-events: none;
+        display: block;
+        width: 100%;
+        bottom: 0;
+        opacity: 0;
+        background: linear-gradient(to top, rgba(0, 0, 0, 0.1), transparent);
+        transition: opacity 0.2s ease;
+        border-radius: 0 0 6px 6px;
+    }
+
+    .card-header {
+        font-size: 18px;
+        font-weight: bold;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        text-align: left;
+        margin-bottom: 10px;
+        color: rgb(159, 239, 0);
+        line-height: 2.4em;
+        padding: 0 0.8em 0.4em;
+        position: relative;
+    }
+
+    .card-header > time {
+        display: block;
+        position: absolute;
+        font-size: 10px;
+        top: 20px;
+        color: #768961;
+    }
+
+    .list-item {
+        display: flex;
+        align-items: center;
+        text-align: left;
+        width: 100%;
+    }
+
+    .list-item-title {
+        display: block;
+        overflow: hidden;
+        text-align: left;
+        margin-bottom: 8px;
+        cursor: pointer;
+        color: #0060a0;
+        text-decoration: none;
+        padding: 0 0.5em;
+        position: relative;
+    }
+
+    #app > section > main > div > div:nth-child(6n+1) > div > div > div.card-header {
+        background: none;
+    }
+
+    #app > section > main > div > div:nth-child(6n+2) > div > div > div.card-header {
+        background: none;
+    }
+
+    #app > section > main > div > div:nth-child(6n+3) > div > div > div.card-header {
+        background: none;
+    }
+
+    #app > section > main > div > div:nth-child(6n+4) > div > div > div.card-header {
+        background: none;
+    }
+
+    #app > section > main > div > div:nth-child(6n+5) > div > div > div.card-header {
+        background: none;
+    }
+
+    #app > section > main > div > div:nth-child(6n) > div > div > div.card-header {
+        background: none;
+    }
+
+    .list-item-title::before {
+        content: "►";
+        position: absolute;
+        margin-left: -1rem;
+        color: rgb(159, 239, 0);
+        cursor: pointer;
+    }
+
+    .title-link {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: left;
+    }
+
+    a {
+        color: black;
+        text-decoration: none;
+    }
+
+    .feed-col {
+        margin-bottom: 20px;
+    }
+
+    .el-card.is-always-shadow {
+        box-shadow: rgb(15, 22, 32) 4px 4px 0px;
+    }
+
+    .el-card {
+        border: none;
+        background: rgb(26, 35, 50);
+        border-radius: 8px;
+    }
+
+    .el-link__inner {
+        display: inline;
+        color: #c3c3c3;
+        text-align: justify;
+        padding-left: 1.4em;
+    }
+
+    .el-link {
+        transition: .2s ease-out;
+    }
+
+    *:hover {
+        text-decoration: none;
+    }
+
+    .el-card__body {
+        padding: 0;
+    }
+
+    .el-link:hover {
+        transform: translateX(4px);
+        color: #b03000
+    }
+
+    .el-link.is-underline:hover:after {
+        border: none;
+    }
+}

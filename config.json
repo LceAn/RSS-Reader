@@ -1,0 +1,38 @@
+{
+    "port": 8080,
+    "values": [
+        "https://linux.do/latest.rss",
+        "https://rss.nodeseek.com",
+        "https://hostloc.com/forum.php?mod=rss&fid=45&auth=389ec3vtQanmEuRoghE%2FpZPWnYCPmvwWgSa7RsfjbQ%2BJpA%2F6y6eHAx%2FKqtmPOg",
+        "https://v2ex.com/feed/tab/tech.xml",
+        "https://www.dalao.net/feed.htm",
+        "https://rsshub.app/kanxue/topic/android/digest",
+        "https://www.52pojie.cn/forum.php?mod=rss"
+    ],
+    "refresh": 5,
+    "autoUpdatePush": 7,
+    "listHeight": 600,
+    "webTitle": "我的rss聚合网页",
+    "webDes":"MJJ",
+    "Github_project_url": "https://github.com/lcean",
+    "Github_project_url_name": "rss-reader",
+    "Github_author_url": "https://github.com/lcean",
+    "Github_author_url_name": "lcean",
+    "keywords": ["cc","cloudcone","rn","racknerd","咸鱼","4837","jpp","hk2p"],
+    "notify" : {
+        "feishu": {
+            "api": ""
+        },
+        "dingtalk": {
+            "webhook": "",
+            "sign": ""
+        },
+        "telegram": {
+            "api": "https://api.telegram.org/bot${token}/sendMessage",
+            "chat_id":"-1001907636479",
+            "token": "6323273906:AAGg_6Lqrnp767BKfejw3z8WiiG498o0WcY"
+        }
+    },
+    "archives": "archives.txt"
+}
+
