@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"rss-reader/globals"
 	"rss-reader/models"
@@ -20,6 +19,7 @@ func init() {
 }
 
 func main() {
+
 	go utils.UpdateFeeds()
 	go utils.WatchConfigFileChanges("config.json")
 	http.HandleFunc("/feeds", getFeedsHandler)
@@ -33,7 +33,9 @@ func main() {
 	http.Handle("/static/", fs)
 	port := globals.RssUrls.Port
 	serve := fmt.Sprintf("%s%d", ":", port)
-	log.Fatal(http.ListenAndServe(serve, nil))
+	if err := http.ListenAndServe(serve, nil); err != nil {
+		utils.NewLogger("SYSTEM").Fatal("启动服务器失败: %v", err)
+	}
 }
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +55,7 @@ func tplHandler(w http.ResponseWriter, r *http.Request) {
 	// 加载模板文件
 	tmpl, err := tmplInstance.Funcs(funcMap).ParseFS(globals.DirStatic, "static/index.html")
 	if err != nil {
-		log.Println("模板加载错误:", err)
+		utils.NewLogger("SYSTEM").Error("模板加载错误:", err)
 		return
 	}
 
@@ -85,14 +87,14 @@ func tplHandler(w http.ResponseWriter, r *http.Request) {
 	// 渲染模板并将结果写入响应
 	err = tmpl.Execute(w, data)
 	if err != nil {
-		log.Println("模板渲染错误:", err)
+		utils.NewLogger("SYSTEM").Error("模板渲染错误:", err)
 	}
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := globals.Upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("Upgrade failed: %v", err)
+		utils.NewLogger("SYSTEM").Error("Upgrade failed: %v", err)
 		return
 	}
 
@@ -103,19 +105,19 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 			cache, ok := globals.DbMap[url]
 			globals.Lock.RUnlock()
 			if !ok {
-				log.Printf("Error getting feed from db is null %v", url)
+				utils.NewLogger("SYSTEM").Error("Error getting feed from db is null %v", url)
 				continue
 			}
 			data, err := json.Marshal(cache)
 			if err != nil {
-				log.Printf("json marshal failure: %s", err.Error())
+				utils.NewLogger("SYSTEM").Error("json marshal failure: %s", err.Error())
 				continue
 			}
 
 			err = conn.WriteMessage(websocket.TextMessage, data)
 			//错误直接关闭更新
 			if err != nil {
-				log.Printf("Error sending message or Connection closed: %v", err)
+				utils.NewLogger("SYSTEM").Error("Error sending message or Connection closed: %v", err)
 				return
 			}
 		}
@@ -136,7 +138,7 @@ func getKeywords() string {
 		cache, ok := globals.DbMap[url]
 		globals.Lock.RUnlock()
 		if !ok {
-			log.Printf("Error getting feed from db is null %v", url)
+			utils.NewLogger("SYSTEM").Error("Error getting feed from db is null %v", url)
 			continue
 		}
 		if cache.Title != "" {

@@ -3,7 +3,6 @@ package utils
 import (
 	"fmt"
 	"github.com/mmcdole/gofeed"
-	"log"
 	"rss-reader/globals"
 	"rss-reader/models"
 	"strings"
@@ -11,6 +10,8 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 )
+
+var feedLogger = NewLogger("FEED")
 
 func escapeMarkdownV2(text string) string {
     replacer := strings.NewReplacer(
@@ -37,10 +38,10 @@ func UpdateFeeds() {
 }
 
 func UpdateFeed(url, formattedTime string) {
-	log.Printf("timer exec get: %s\n", url)
+	feedLogger.Info("Start fetching feed url=%s", url)
 	result, err := globals.Fp.ParseURL(url)
 	if err != nil {
-		log.Printf("Error fetching feed: %v | %v", url, err)
+		feedLogger.Warn("Failed to fetch feed url=%s, error=%v", url, err)
 		return
 	}
 	//feed内容无更新时无需更新缓存
@@ -77,7 +78,7 @@ func GetFeeds() []models.Feed {
 		cache, ok := globals.DbMap[url]
 		globals.Lock.RUnlock()
 		if !ok {
-			log.Printf("Error getting feed from db is null %v", url)
+			feedLogger.Warn("Error getting feed from db is null %v", url)
 			continue
 		}
 
@@ -90,14 +91,14 @@ func WatchConfigFileChanges(filePath string) {
 	// 创建一个新的监控器
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatal(err)
+		NewLogger("SYSTEM").Fatal("File watcher setup failed: %v", err)
 	}
 	defer watcher.Close()
 
 	// 添加要监控的文件
 	err = watcher.Add(filePath)
 	if err != nil {
-		log.Fatal(err)
+		NewLogger("SYSTEM").Error("File watcher error: %v", err)
 	}
 
 	// 启动一个 goroutine 来处理文件变化事件
@@ -107,11 +108,11 @@ func WatchConfigFileChanges(filePath string) {
 			select {
 			case event, ok := <-watcher.Events:
 				if !ok {
-					log.Println("通道关闭1")
+					System("通道关闭1")
 					return
 				}
 				if event.Op&fsnotify.Write == fsnotify.Write {
-					log.Println("文件已修改")
+					System("文件已修改")
 					globals.Init()
 					formattedTime := time.Now().Format("2006-01-02 15:04:05")
 					for _, url := range globals.RssUrls.Values {
@@ -120,10 +121,10 @@ func WatchConfigFileChanges(filePath string) {
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
-					log.Println("通道关闭2")
+					System("通道关闭2")
 					return
 				}
-				log.Println("错误:", err)
+				System("错误:", err)
 				return
 			}
 		}

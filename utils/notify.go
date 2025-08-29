@@ -10,13 +10,14 @@ import (
 	"github.com/mmcdole/gofeed"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"rss-reader/globals"
 	"strings"
 	"time"
 )
+
+var notifyLogger = NewLogger("NOTIFY")
 
 const (
 	FeiShuRoute   = "feishu"
@@ -84,7 +85,7 @@ func Notify(msg Message) {
 				sendToDingtalk(msg)
 			}
 		default:
-			log.Println("without route")
+			notifyLogger.Warn("without route")
 		}
 	}
 }
@@ -96,7 +97,7 @@ func sendToTelegram(msg Message) {
             ParseMode: "MarkdownV2", // 告诉 Telegram 使用 Markdown V2 解析
         })
     if err != nil {
-        log.Printf("json marshal err: %+v\n", err)
+        notifyLogger.Error("json marshal err: %+v\n", err)
         return
     }
     api := strings.ReplaceAll(globals.RssUrls.Notify.Telegram.API, TokenReplace, globals.RssUrls.Notify.Telegram.Token)
@@ -134,7 +135,7 @@ func sendToDingtalk(msg Message) {
 			},
 		})
 	if err != nil {
-		log.Printf("json marshal err: %+v\n", err)
+		notifyLogger.Error("json marshal err: %+v\n", err)
 		return
 	}
 	api := globals.RssUrls.Notify.Dingtalk.Webhook
@@ -154,7 +155,7 @@ func sendToFeiShu(msg Message) {
 			},
 		})
 	if err != nil {
-		log.Printf("json marshal err: %+v\n", err)
+		notifyLogger.Error("json marshal err: %+v\n", err)
 		return
 	}
 	requestPost(globals.RssUrls.Notify.FeiShu.API, finalMsg)
@@ -165,21 +166,25 @@ func requestPost(url string, param []byte) {
 	resp, err := http.Post(url, ContentType, requestBody)
 
 	if err != nil {
-		log.Printf("http post err: %+v\n", err)
+		notifyLogger.Error("HTTP POST request failed: %v", err)
 		return
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			log.Printf("http body close err: %+v\n", err)
+			notifyLogger.Error("http body close err: %+v\n", err)
 		}
 	}(resp.Body)
 	body, err := ioutil.ReadAll(resp.Body) // 读取响应内容
 	if err != nil {
-		log.Printf("http post read body err: %+v\n", err)
+		notifyLogger.Error("http post read body err: %+v\n", err)
 		return
 	}
-	log.Printf("response status: %s,response body:%s", string(body), resp.Status)
+	if resp.StatusCode >= 400 {
+		notifyLogger.Error("Notification API response error status=\"%s\", body=%s", resp.Status, string(body))
+	} else {
+		notifyLogger.Info("Notification API response success status=\"%s\", body=%s", resp.Status, string(body))
+	}
 	//string(body)
 	return
 }
