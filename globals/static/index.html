@@ -16,32 +16,7 @@
 
     <link rel="stylesheet" href="chrome-extension://bflmgpechpeohjfomgfdkkfcbhfcjohl/css/globalHighlightStyles.css">
 </head>
-<style>
-    body {
-        position: relative;
-    }
-    #settings-btn {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        padding: 8px 16px;
-        background-color: #f8f9fa;
-        color: #5f6368;
-        border: 1px solid #dfe1e5;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-        outline: none;
-    }
-    #settings-btn:hover {
-        box-shadow: 0 1px 1px rgba(0,0,0,0.1);
-        background-color: #f0f0f0;
-    }
-    #settings-btn:focus {
-        border-color: #c8dafc;
-        background-color: #e8f0fe;
-    }
-</style>
+
 <body>
 <div id="app">
     <el-container>
@@ -50,7 +25,6 @@
                 << .WebTitle >>
             </h1>
 
-            <button id="settings-btn" @click="toggleSettings"> ⚙ </button>
             <!-- Settings Panel -->
             <div v-if="showSettings" style="border: 1px solid #ccc; padding: 20px; margin-top: 10px;">
                 <h2>Settings</h2>
@@ -294,54 +268,5 @@
     app.use(ElementPlus);
     app.mount("#app");
 </script>
-
-<!--设置按钮的js-->
-<script>
-    const { createApp } = Vue;
-    createApp({
-        data() {
-            return {
-                showSettings: false,
-                config: {}
-            };
-        },
-        created() {
-            this.getConfig();
-        },
-        methods: {
-            toggleSettings() {
-                this.showSettings = !this.showSettings;
-                console.log("Settings toggled: ", this.showSettings);
-            },
-            getConfig() {
-                fetch('/api/config')
-                    .then(response => response.json())
-                    .then(data => {
-                        this.config = data;
-                        console.log("Config loaded: ", this.config);
-                    });
-            },
-            updateConfig() {
-                fetch('/api/config', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(this.config)
-                }).then(response => {
-                    console.log(response);
-                    if (response.ok) {
-                        alert('Configuration Updated');
-                        this.showSettings = false;
-                    } else {
-                        alert('Failed to update configuration');
-                    }
-                });
-            }
-        }
-    }).mount("#app");
-</script>
-
-
 </body>
 </html>
