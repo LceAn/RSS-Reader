@@ -7,11 +7,10 @@ import (
 	"net/http"
 	"rss-reader/globals"
 	"rss-reader/models"
-
 	"rss-reader/utils"
+	"strings"
+	"sync/atomic"
 	"time"
-
-	"github.com/gorilla/websocket"
 )
 
 func init() {
@@ -19,142 +18,191 @@ func init() {
 }
 
 func main() {
-
 	go utils.UpdateFeeds()
 	go utils.WatchConfigFileChanges("config.json")
+
+	http.HandleFunc("/", tplHandler)
+	http.Handle("/static/", http.FileServer(http.FS(globals.DirStatic)))
 	http.HandleFunc("/feeds", getFeedsHandler)
 	http.HandleFunc("/ws", wsHandler)
-	http.HandleFunc("/api/config", configHandler) // 新增路由处理函数
-	// http.HandleFunc("/", serveHome)
-	http.HandleFunc("/", tplHandler)
+	http.HandleFunc("/api/config", configHandler)
 
-	//加载静态文件
-	fs := http.FileServer(http.FS(globals.DirStatic))
-	http.Handle("/static/", fs)
 	port := globals.RssUrls.Port
-	serve := fmt.Sprintf("%s%d", ":", port)
-	utils.System("服务启动中...")
-    utils.System("网页监听地址为: http://localhost:%d", port)
-    utils.System("按 CTRL+C 退出程序.")
+	listenAddress := fmt.Sprintf(":%d", port)
 
-	if err := http.ListenAndServe(serve, nil); err != nil {
+	utils.System("服务启动中...")
+	utils.System("网页监听地址为: http://localhost:%d", port)
+	utils.System("按 CTRL+C 退出程序.")
+
+	if err := http.ListenAndServe(listenAddress, nil); err != nil {
 		utils.NewLogger("SYSTEM").Fatal("启动服务器失败: %v", err)
 	}
 }
 
-func serveHome(w http.ResponseWriter, r *http.Request) {
-	w.Header().Add("Content-Type", "text/html; charset=utf-8")
-	w.Write(globals.HtmlContent)
-}
-
 func tplHandler(w http.ResponseWriter, r *http.Request) {
-	// 创建一个新的模板，并设置自定义分隔符为<< >>，避免与Vue的语法冲突
 	tmplInstance := template.New("index.html").Delims("<<", ">>")
-	//添加加法函数计数
 	funcMap := template.FuncMap{
 		"inc": func(i int) int {
 			return i + 1
 		},
 	}
-	// 加载模板文件
 	tmpl, err := tmplInstance.Funcs(funcMap).ParseFS(globals.DirStatic, "static/index.html")
 	if err != nil {
-		utils.NewLogger("SYSTEM").Error("模板加载错误:", err)
+		utils.NewLogger("SYSTEM").Error("模板加载错误: %v", err)
+		http.Error(w, "Internal Server Error", 500)
 		return
 	}
 
-	// 定义一个数据对象
 	data := struct {
-		Keywords                string
-		RssDataList             []models.Feed
-		AutoUpdatePush          int
-		ListHeight              int
-		WebTitle                string
-		WebDes                  string
+		Keywords              string
+		RssDataList           []models.Feed
+		AutoUpdatePush        int
+		ListHeight            int
+		WebTitle              string
+		WebDes                string
 		Github_project_url      string
 		Github_project_url_name string
 		Github_author_url       string
 		Github_author_url_name  string
 	}{
-		Keywords:                getKeywords(),
-		RssDataList:             utils.GetFeeds(),
-		AutoUpdatePush:          globals.RssUrls.AutoUpdatePush,
-		ListHeight:              globals.RssUrls.ListHeight,
-		WebTitle:                globals.RssUrls.WebTitle,
-		WebDes:                  globals.RssUrls.WebDes,
+		Keywords:              getKeywords(),
+		RssDataList:           utils.GetFeeds(),
+		AutoUpdatePush:        globals.RssUrls.AutoUpdatePush,
+		ListHeight:            globals.RssUrls.ListHeight,
+		WebTitle:              globals.RssUrls.WebTitle,
+		WebDes:                globals.RssUrls.WebDes,
 		Github_project_url:      globals.RssUrls.Github_project_url,
 		Github_project_url_name: globals.RssUrls.Github_project_url_name,
 		Github_author_url:       globals.RssUrls.Github_author_url,
 		Github_author_url_name:  globals.RssUrls.Github_author_url_name,
 	}
 
-	// 渲染模板并将结果写入响应
 	err = tmpl.Execute(w, data)
 	if err != nil {
-		utils.NewLogger("SYSTEM").Error("模板渲染错误:", err)
+		utils.NewLogger("SYSTEM").Error("模板渲染错误: %v", err)
 	}
 }
 
-func wsHandler(w http.ResponseWriter, r *http.Request) {
-	conn, err := globals.Upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		utils.NewLogger("SYSTEM").Error("Upgrade failed: %v", err)
-		return
-	}
-
-	defer conn.Close()
-	for {
-		for _, url := range globals.RssUrls.Values {
-			globals.Lock.RLock()
-			cache, ok := globals.DbMap[url]
-			globals.Lock.RUnlock()
-			if !ok {
-				utils.NewLogger("SYSTEM").Error("Error getting feed from db is null %v", url)
-				continue
-			}
-			data, err := json.Marshal(cache)
-			if err != nil {
-				utils.NewLogger("SYSTEM").Error("json marshal failure: %s", err.Error())
-				continue
-			}
-
-			err = conn.WriteMessage(websocket.TextMessage, data)
-			//错误直接关闭更新
-			if err != nil {
-				utils.NewLogger("SYSTEM").Error("Error sending message or Connection closed: %v", err)
-				return
-			}
-		}
-		//如果未配置则不自动更新
-		if globals.RssUrls.AutoUpdatePush == 0 {
-			return
-		}
-		time.Sleep(time.Duration(globals.RssUrls.AutoUpdatePush) * time.Minute)
-	}
-}
-
-// 获取关键词也就是title
-// 获取feeds列表
 func getKeywords() string {
-	words := ""
+	var words []string
 	for _, url := range globals.RssUrls.Values {
 		globals.Lock.RLock()
 		cache, ok := globals.DbMap[url]
 		globals.Lock.RUnlock()
 		if !ok {
-			utils.NewLogger("SYSTEM").Error("Error getting feed from db is null %v", url)
 			continue
 		}
 		if cache.Title != "" {
-			words += cache.Title + ","
+			words = append(words, cache.Title)
 		}
 	}
-	return words
+	return strings.Join(words, ",")
+}
+
+func wsHandler(w http.ResponseWriter, r *http.Request) {
+	conn, err := globals.Upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		utils.NewLogger("WEBSOCKET").Error("Failed to upgrade connection: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	wsLogger := utils.NewLogger("WEBSOCKET")
+	wsLogger.Info("Connection opened from %s", r.RemoteAddr)
+
+	// --- 修正开始 ---
+
+	// 1. 立即发送一次初始 Feed 数据
+	initialFeeds := utils.GetFeeds()
+	if len(initialFeeds) > 0 {
+		if err := conn.WriteJSON(map[string]interface{}{
+			"type": "feeds",
+			"data": initialFeeds,
+		}); err != nil {
+			wsLogger.Warn("Failed to write initial feeds JSON: %v. Closing connection.", err)
+			return
+		}
+	}
+	lastSentFeeds := initialFeeds
+
+	// --- 修正结束 ---
+
+	statusTicker := time.NewTicker(1 * time.Second)
+	defer statusTicker.Stop()
+
+	refreshDuration := time.Duration(globals.RssUrls.AutoUpdatePush) * time.Minute
+	if globals.RssUrls.AutoUpdatePush == 0 {
+		refreshDuration = 24 * time.Hour
+	}
+	feedUpdateTicker := time.NewTicker(refreshDuration)
+	defer feedUpdateTicker.Stop()
+
+	nextRefreshTime := time.Now().Add(refreshDuration)
+
+	for {
+		select {
+		case <-statusTicker.C:
+			totalFeeds := len(globals.RssUrls.Values)
+			failedCount := int(atomic.LoadInt32(&globals.FailedFeedCount))
+			successfulCount := totalFeeds - failedCount
+			if successfulCount < 0 {
+				successfulCount = 0
+			}
+			remainingSeconds := int(time.Until(nextRefreshTime).Seconds())
+			if remainingSeconds < 0 {
+				remainingSeconds = 0
+			}
+			status := globals.SystemStatus{
+				Type:          "status",
+				TotalFeeds:    totalFeeds,
+				Successful:    successfulCount,
+				Failed:        failedCount,
+				NextRefreshIn: remainingSeconds,
+			}
+			if err := conn.WriteJSON(status); err != nil {
+				wsLogger.Warn("Failed to write status JSON: %v. Closing connection.", err)
+				return
+			}
+
+		case <-feedUpdateTicker.C:
+			if globals.RssUrls.AutoUpdatePush > 0 {
+				nextRefreshTime = time.Now().Add(refreshDuration)
+				currentFeeds := utils.GetFeeds()
+
+				if len(currentFeeds) > 0 && !feedsAreEqual(lastSentFeeds, currentFeeds) {
+					if err := conn.WriteJSON(map[string]interface{}{
+						"type": "feeds",
+						"data": currentFeeds,
+					}); err != nil {
+						wsLogger.Warn("Failed to write feeds JSON: %v. Closing connection.", err)
+						return
+					}
+					lastSentFeeds = currentFeeds
+				}
+			}
+		}
+	}
+}
+
+func feedsAreEqual(a, b []models.Feed) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].Link != b[i].Link || len(a[i].Items) != len(b[i].Items) {
+			return false
+		}
+		if len(a[i].Items) > 0 && len(b[i].Items) > 0 {
+			if a[i].Items[0].Link != b[i].Items[0].Link {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func getFeedsHandler(w http.ResponseWriter, r *http.Request) {
 	feeds := utils.GetFeeds()
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(feeds)
 }
@@ -187,8 +235,6 @@ func handleConfigPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error decoding config", http.StatusBadRequest)
 		return
 	}
-	// 更新配置逻辑，可能需要验证更新内容的有效性
 	globals.RssUrls = config
-	// 可以添加保存到文件的逻辑
 	w.WriteHeader(http.StatusOK)
 }

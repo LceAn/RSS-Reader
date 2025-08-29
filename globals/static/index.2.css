@@ -1,9 +1,9 @@
 /* ==========================================================================
-   Modern & Elegant RSS Reader Style by Gemini - V9 (Branded Header Title)
+   Modern & Elegant RSS Reader Style by Gemini - V10 (Status Indicator)
    ========================================================================== */
 
 /**
- * 1. Design System: CSS Variables
+ * 1. Design System
  * -------------------------------------------------------------------------- */
  :root {
     /* Color Palette (Light Mode) */
@@ -26,15 +26,14 @@
     --footer-text-color: #6c757d;
     --icon-color: #6c757d;
     --icon-hover-color: #007bff;
-    --title-gradient: linear-gradient(135deg, #007bff 0%, #6f42c1 100%); /* New: Title gradient */
+    --title-gradient: linear-gradient(135deg, #007bff 0%, #6f42c1 100%);
+    --status-ok-color: #28a745;
+    --status-warn-color: #ffc107;
 
-
-    /* Typography */
+    /* Typography, Spacing, Radius */
     --font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
     --font-size-base: 16px;
     --font-weight-bold: 600;
-
-    /* Spacing & Radius */
     --spacing-unit: 1rem;
     --border-radius: 12px;
 }
@@ -61,13 +60,15 @@
         --footer-text-color: #a0a0a0;
         --icon-color: #a0a0a0;
         --icon-hover-color: #58a6ff;
-        --title-gradient: linear-gradient(135deg, #58a6ff 0%, #c58af9 100%); /* New: Title gradient (dark) */
+        --title-gradient: linear-gradient(135deg, #58a6ff 0%, #c58af9 100%);
+        --status-ok-color: #48c78e;
+        --status-warn-color: #ffd83d;
     }
 }
 
 
 /**
- * 2. Keyframes for Animations ... (no changes in this section)
+ * 2. Keyframes for Animations
  * -------------------------------------------------------------------------- */
 @keyframes fadeInSlideUp {
     from { opacity: 0; transform: translateY(20px); }
@@ -79,9 +80,28 @@
     to { transform: translateX(calc(-100% + var(--spacing-unit) * 3)); }
 }
 
+@keyframes breathe {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.1); opacity: 1; }
+}
+
+@keyframes breathe-warn {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.2); opacity: 1; }
+}
+
+/* Vue Transition Classes for the popup */
+.popup-enter-active, .popup-leave-active {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.popup-enter-from, .popup-leave-to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+}
+
 
 /**
- * 3. Base & Layout Styles (Header Title Enhanced)
+ * 3. Base & Layout Styles
  * -------------------------------------------------------------------------- */
 html { min-height: 100%; }
 
@@ -105,32 +125,26 @@ body {
 }
 
 .el-header {
-    /* New: Added to align title and icon */
     display: flex;
     justify-content: center;
     align-items: center;
+    position: relative; /* Needed for absolute positioning of children */
 }
 
 .el-header h1 {
-    /* New: Applying the beautiful gradient text effect */
     background: var(--title-gradient);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     text-fill-color: transparent;
-
-    /* New: Fine-tuning typography */
-    font-size: 2.5rem; /* Larger font size */
+    font-size: 2.5rem;
     font-weight: 700;
-    letter-spacing: -1px; /* Tighter letter spacing */
+    letter-spacing: -1px;
     margin-bottom: calc(var(--spacing-unit) * 2);
-    text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.05); /* Subtle shadow */
-
-    /* Reusing existing animation */
+    text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.05);
     animation: fadeInSlideUp 0.6s ease-out forwards;
 }
 
-/* New: Adding an icon before the title */
 .el-header h1::before {
     content: '';
     display: inline-block;
@@ -139,10 +153,8 @@ body {
     margin-right: calc(var(--spacing-unit) * 0.75);
     vertical-align: middle;
     position: relative;
-    top: -4px; /* Adjust vertical alignment */
-    
-    /* Using the RSS feed icon */
-    background-color: #ced4da; /* Fallback color, will be masked */
+    top: -4px;
+    background-color: #ced4da;
     -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4a2 2 0 0 0-2 2v2.28a.75.75 0 0 0 .75.75h2.53a.75.75 0 0 0 .75-.75V6a2 2 0 0 0-2-2zM4 11.47a2 2 0 0 0-2 2v4.06a.75.75 0 0 0 .75.75h6.56a.75.75 0 0 0 .75-.75V17.5a6.5 6.5 0 0 0-6.5-6.03zM4 19.53a.75.75 0 0 1 .75-.75h13.51a.75.75 0 0 1 .75.75v.06A3.5 3.5 0 0 1 15.5 23H4.75a.75.75 0 0 1-.75-.75v-2.72z"/></svg>') center/contain no-repeat;
     mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4a2 2 0 0 0-2 2v2.28a.75.75 0 0 0 .75.75h2.53a.75.75 0 0 0 .75-.75V6a2 2 0 0 0-2-2zM4 11.47a2 2 0 0 0-2 2v4.06a.75.75 0 0 0 .75.75h6.56a.75.75 0 0 0 .75-.75V17.5a6.5 6.5 0 0 0-6.5-6.03zM4 19.53a.75.75 0 0 1 .75-.75h13.51a.75.75 0 0 1 .75.75v.06A3.5 3.5 0 0 1 15.5 23H4.75a.75.75 0 0 1-.75-.75v-2.72z"/></svg>') center/contain no-repeat;
 }
@@ -155,8 +167,114 @@ body {
 
 
 /**
- * 4. Card Component Styles & Animations ... (no changes in this section)
- * ... (The rest of the file remains unchanged) ...
+ * 4. Status Indicator & Settings Button
+ * -------------------------------------------------------------------------- */
+.status-container {
+    position: absolute;
+    top: 30px;
+    left: 20px;
+}
+
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.status-indicator-ok {
+    background-color: var(--status-ok-color);
+    box-shadow: 0 0 10px var(--status-ok-color);
+    animation: breathe 4s ease-in-out infinite;
+}
+
+.status-indicator-warn {
+    background-color: var(--status-warn-color);
+    box-shadow: 0 0 12px var(--status-warn-color);
+    animation: breathe-warn 2s ease-in-out infinite;
+}
+
+.status-popup {
+    position: absolute;
+    top: 150%;
+    left: -20px;
+    width: 220px;
+    background: var(--card-bg-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-hover-shadow);
+    padding: var(--spacing-unit);
+    text-align: left;
+    z-index: 100;
+    transform-origin: top left;
+}
+.status-popup h4 {
+    margin: 0 0 var(--spacing-unit) 0;
+    color: var(--text-color-primary);
+    border-bottom: 1px solid var(--card-header-border);
+    padding-bottom: calc(var(--spacing-unit) * 0.5);
+}
+.status-popup ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.status-popup li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    color: var(--text-color-secondary);
+    padding: calc(var(--spacing-unit) * 0.3) 0;
+}
+.status-popup li strong {
+    color: var(--text-color-primary);
+    font-weight: 600;
+}
+.status-popup li strong.has-error {
+    color: var(--status-warn-color);
+}
+.status-popup .countdown {
+    margin-top: var(--spacing-unit);
+    padding-top: calc(var(--spacing-unit) * 0.5);
+    border-top: 1px solid var(--card-header-border);
+    font-size: 0.9rem;
+    color: var(--text-color-secondary);
+}
+
+#settings-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    padding: 8px 16px;
+    background-color: var(--card-bg-color);
+    color: var(--text-color-primary);
+    border: 1px solid var(--card-header-border);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    outline: none;
+    transition: all 0.2s ease-in-out;
+}
+#settings-btn:hover {
+    box-shadow: var(--card-shadow);
+    transform: translateY(-2px);
+}
+
+.settings-panel {
+    position: absolute;
+    top: 70px;
+    right: 20px;
+    background-color: var(--card-bg-color);
+    padding: 20px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-hover-shadow);
+    z-index: 100;
+}
+
+
+/**
+ * 5. Card Component Styles
  * -------------------------------------------------------------------------- */
 .feed-col {
     margin-bottom: calc(var(--spacing-unit) * 1.5);
@@ -213,7 +331,7 @@ body {
 
 
 /**
- * 5. Modernized List & Link Styles ... (no changes in this section)
+ * 6. Modernized List & Link Styles
  * -------------------------------------------------------------------------- */
 .el-card__body {
     padding: calc(var(--spacing-unit) * 0.5) 0;
@@ -286,7 +404,7 @@ a:visited, .el-link:visited {
 
 
 /**
- * 6. Scrollbar Styles ... (no changes in this section)
+ * 7. Scrollbar Styles
  * -------------------------------------------------------------------------- */
 ::-webkit-scrollbar {
     width: 8px;
@@ -323,7 +441,7 @@ a:visited, .el-link:visited {
 
 
 /**
- * 7. Refined Footer Styles ... (no changes in this section)
+ * 8. Refined Footer Styles
  * -------------------------------------------------------------------------- */
 .el-footer {
     display: flex;

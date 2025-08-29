@@ -7,6 +7,7 @@ import (
 	"rss-reader/models"
 	"strings"
 	"time"
+	"sync/atomic"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -29,6 +30,7 @@ func UpdateFeeds() {
 		tick = time.Tick(time.Duration(globals.RssUrls.ReFresh) * time.Minute)
 	)
 	for {
+		atomic.StoreInt32(&globals.FailedFeedCount, 0) // <-- 新增：重置失败计数器
 		formattedTime := time.Now().Format("2006-01-02 15:04:05")
 		for _, url := range globals.RssUrls.Values {
 			go UpdateFeed(url, formattedTime)
@@ -42,6 +44,7 @@ func UpdateFeed(url, formattedTime string) {
 	result, err := globals.Fp.ParseURL(url)
 	if err != nil {
 		feedLogger.Warn("Failed to fetch feed url=%s, error=%v", url, err)
+		atomic.AddInt32(&globals.FailedFeedCount, 1) // <-- 新增：失败计数+1
 		return
 	}
 	//feed内容无更新时无需更新缓存
@@ -91,7 +94,7 @@ func WatchConfigFileChanges(filePath string) {
 	// 创建一个新的监控器
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		NewLogger("SYSTEM").Fatal("File watcher setup failed: %v", err)
+		NewLogger("SYSTEM").Error("File watcher setup failed: %v", err)
 	}
 	defer watcher.Close()
 

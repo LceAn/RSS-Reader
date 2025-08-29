@@ -8,15 +8,10 @@
     <meta name="keywords" content="<< .Keywords >>">
     <meta name="author" content="srcrs">
     <link rel="stylesheet" href="static/index.min.css">
-    <!-- 背景动画 -->
     <link rel="stylesheet" href="static/background.cartoon.css">
-    <!-- 列表格式 -->
     <link rel="stylesheet" href="static/index.2.css">
     <link rel="icon" href="static/favicon.svg" type="image/x-icon">
-
-    <link rel="stylesheet" href="chrome-extension://bflmgpechpeohjfomgfdkkfcbhfcjohl/css/globalHighlightStyles.css">
 </head>
-
 <body>
 <div id="app">
     <el-container>
@@ -24,50 +19,60 @@
             <h1>
                 << .WebTitle >>
             </h1>
-
-            <!-- Settings Panel -->
-            <div v-if="showSettings" style="border: 1px solid #ccc; padding: 20px; margin-top: 10px;">
-                <h2>Settings</h2>
-                <div>
-                    <label>Port:</label>
-                    <input type="text" v-model="config.port">
-                </div>
-                <div>
-                    <button @click="updateConfig">Save Changes</button>
-                    <button @click="toggleSettings">Close</button>
-                </div>
+            <div class="status-container" @mouseenter="showStatusPopup = true" @mouseleave="showStatusPopup = false">
+                <div class="status-indicator" :class="indicatorClass"></div>
+                <transition name="popup">
+                    <div class="status-popup" v-if="showStatusPopup">
+                        <h4>系统状态</h4>
+                        <ul>
+                            <li><span>订阅源</span> <strong>{{ systemStatus.totalFeeds }}</strong></li>
+                            <li><span>成功</span> <strong>{{ systemStatus.successful }}</strong></li>
+                            <li><span>失败</span> <strong :class="{ 'has-error': systemStatus.failed > 0 }">{{ systemStatus.failed }}</strong></li>
+                        </ul>
+                        <div class="countdown">
+                            下次刷新: <strong>{{ formattedCountdown }}</strong>
+                        </div>
+                    </div>
+                </transition>
             </div>
+
+            <button id="settings-btn" @click="toggleSettings"> ⚙ </button>
+            <transition name="popup">
+                <div v-if="showSettings" class="settings-panel">
+                    <h2>Settings</h2>
+                    <div>
+                        <label>Port:</label>
+                        <input type="text" v-model="config.port">
+                    </div>
+                    <div>
+                        <button @click="updateConfig">Save Changes</button>
+                        <button @click="toggleSettings">Close</button>
+                    </div>
+                </div>
+            </transition>
 
         </el-header>
         <el-main v-loading.fullscreen.lock="fullscreenLoading" element-loading-text="拼命加载中">
             <el-row :gutter="20">
-                << range $index, $feed :=.RssDataList >>
-                <el-col v-if="showSEOFlag" :xs="24" :sm="12" :md="8" :lg="6" :key="index" class="feed-col">
+                << $root := . >> << range $index, $feed := .RssDataList >>
+                <el-col v-if="showSEOFlag" :xs="24" :sm="12" :md="8" :lg="6" :key="$index" class="feed-col">
                     <el-card class="box-card">
                         <div slot="header" class="card-header">
-                  <span>
-                    << $feed.Title >>
-                  </span>
-                            <time class="time">
-                                << $feed.Custom.lastupdate >>
-                            </time>
+                            <span><< $feed.Title >></span>
+                            <time class="time"><< $feed.Custom.lastupdate >></time>
                         </div>
-                        <el-scrollbar style="height: 300px;">
-                            << range $i, $item :=$feed.Items >>
-                            <el-list key="<< $i >>">
+                        <el-scrollbar :style="{ height: '<< $root.ListHeight >>px' }">
+                            <el-list>
+                                << range $i, $item :=$feed.Items >>
                                 <el-list-item>
                                     <div class="list-item-title">
-                          <span>
-                            << inc $i >>.
-                          </span>
-                                        <el-link href="<< $item.Link >>" target="_blank"
-                                                 title="<< $item.Title >>">
+                                        <el-link href="<< $item.Link >>" target="_blank" :title="$item.Title">
                                             << $item.Title >>
                                         </el-link>
                                     </div>
                                 </el-list-item>
+                                << end >>
                             </el-list>
-                            << end >>
                         </el-scrollbar>
                     </el-card>
                 </el-col>
@@ -79,14 +84,11 @@
                             <span>{{ feed.title }}</span>
                             <time class="time">{{ feed.custom.lastupdate }}</time>
                         </div>
-                        <el-scrollbar style="height: << .ListHeight >>px;">
+                        <el-scrollbar :style="{ height: '<< .ListHeight >>px' }">
                             <el-list v-for="(item, i) in feed.items" :key="i">
                                 <el-list-item>
                                     <div class="list-item-title">
-                                        <!--                          <span>{{ i+1 }}. </span>-->
-                                        <el-link :href="item.link" target="_blank" :title="item.title">{{
-                                            item.title }}
-                                        </el-link>
+                                        <el-link :href="item.link" target="_blank" :title="item.title">{{ item.title }}</el-link>
                                     </div>
                                 </el-list-item>
                             </el-list>
@@ -97,15 +99,16 @@
         </el-main>
         <el-footer>
             <el-link href="<< .Github_project_url >>" target="_blank"><< .Github_project_url_name>></el-link>
-            <span> | </span>
             <el-link href="<< .Github_author_url >>" target="_blank"><< .Github_author_url_name>></el-link>
         </el-footer>
     </el-container>
 </div>
 <div>
-    <canvas class="canvas-webgl" width="3176" height="2264" style="width: 1588px; height: 1132px;"></canvas>
+    <canvas class="canvas-webgl"></canvas>
 </div>
-<script src="static/three.min.js" type="text/javascript"></script>
+<script src="static/three.min.js"></script>
+<script src="static/vue.global.prod.js"></script>
+<script src="static/index.full.min.js"></script>
 <script type="text/javascript">
     (function (window) {
         var Plane = function () {
@@ -151,11 +154,13 @@
         var plane = new Plane()
 
         function resizeWindow() {
-            canvas.width = window.innerWidth
-            canvas.height = window.innerHeight
-            camera.aspect = window.innerWidth / window.innerHeight
+            var w = window.innerWidth;
+            var h = window.innerHeight;
+            canvas.width = w
+            canvas.height = h
+            camera.aspect = w / h
             camera.updateProjectionMatrix()
-            renderer.setSize(window.innerWidth, window.innerHeight)
+            renderer.setSize(w, h)
         }
 
         function render() {
@@ -179,16 +184,11 @@
             window.addEventListener('resize', resizeWindow)
             resizeWindow()
             renderLoop()
-            // document.querySelector('.canvas-wrapper')
         }
 
         init()
     };
-
 </script>
-
-<script src="static/vue.global.prod.js"></script>
-<script src="static/index.full.min.js"></script>
 <script>
     const app = Vue.createApp({
         data() {
@@ -196,72 +196,87 @@
                 feeds: [],
                 showSEOFlag: true,
                 fullscreenLoading: true,
-                countdown: 60,
+                systemStatus: {
+                    totalFeeds: 0,
+                    successful: 0,
+                    failed: 0,
+                    nextRefreshIn: 0,
+                },
+                showStatusPopup: false,
                 isPc: true,
-                autoUpdatePush: <<.AutoUpdatePush >>,
-                listHeight: <<.ListHeight >>,
-                webTitle: <<.WebTitle >>,
-                webDes: <<.WebDes >>,
+                autoUpdatePush: << .AutoUpdatePush >> ,
+                listHeight: << .ListHeight >> ,
+                showSettings: false,
+                config: {},
             };
         },
-        async created() {
-            this.fullscreenLoading = false;
-            // 使用媒体查询判断设备类型
-            this.isPc = !window.matchMedia('(max-width: 767px)').matches;
+        computed: {
+            indicatorClass() {
+                if (this.systemStatus.failed > 0) {
+                    return 'status-indicator-warn';
+                }
+                return 'status-indicator-ok';
+            },
+            formattedCountdown() {
+                const seconds = this.systemStatus.nextRefreshIn;
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+            }
         },
-        async mounted() {
+        methods: {
+            toggleSettings() {
+                this.showSettings = !this.showSettings;
+            },
+            getConfig() {
+                // In a real app, you would fetch this from an API
+                // For now, we can use placeholder data
+                this.config = { port: '8080' };
+            },
+            updateConfig() {
+                // In a real app, you would send this to an API
+                console.log("Saving config:", this.config);
+                alert('Configuration Updated (simulated)');
+                this.showSettings = false;
+            }
+        },
+        mounted() {
+            this.fullscreenLoading = false;
+            this.isPc = !window.matchMedia('(max-width: 767px)').matches;
+            this.getConfig();
+
             const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
             const connect = () => {
                 const socket = new WebSocket(protocol + window.location.host + "/ws");
                 socket.onmessage = event => {
-                    const feed = JSON.parse(event.data);
-                    const existingFeed = this.feeds.find(f => f.link === feed.link);
-                    if (existingFeed) {
-                        Object.assign(existingFeed, feed);
-                    } else {
-                        this.feeds.push(feed);
+                    const message = JSON.parse(event.data);
+                    if (message.type === 'status') {
+                        this.systemStatus = message;
+                    } else if (message.type === 'feeds' && message.data) {
+                        this.feeds = message.data;
+                        this.showSEOFlag = false;
+                    } else if (Array.isArray(message)) { // Fallback for older server versions
+                        this.feeds = message;
+                        this.showSEOFlag = false;
                     }
-                    this.showSEOFlag = false;
                 };
+
                 const reloadHtml = () => {
                     if (socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
                         if (document.visibilityState === 'visible') {
-                            // 刷新网页
-                            console.log("reload...")
+                            console.log("WebSocket closed. Reloading page.");
                             location.reload();
                         }
                     }
                 }
-                socket.onclose = event => {
+                socket.onclose = () => {
                     if (this.isPc && this.autoUpdatePush > 0) {
-                        console.log("WebSocket closed. Reconnecting...");
+                        console.log("WebSocket connection closed. Attempting to reconnect...");
                         setInterval(reloadHtml, 3000);
                     }
                 };
-                // Send heartbeat message every 60 seconds
-                const sendHeartbeat = () => {
-                    if (socket.readyState === WebSocket.OPEN) {
-                        socket.send("heartbeat");
-                    } else if (socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
-                        reloadHtml()
-                    }
-                };
-                if (this.isPc && this.autoUpdatePush > 0) {
-                    setInterval(sendHeartbeat, 60000);
-                    setInterval(() => {
-                        if (this.countdown > 0) {
-                            this.countdown--;
-                        } else {
-                            this.countdown = 60;
-                        }
-                    }, 1000);
-                }
             };
             connect();
-        },
-        beforeDestroy() {
-            // 在组件销毁前手动关闭 WebSocket 连接
-            this.socket.close();
         }
     });
 
