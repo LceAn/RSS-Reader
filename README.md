@@ -1,137 +1,111 @@
-# 简述
+# 🍃 RSS-Reader：您的智能信息过滤与推送中心
 
-实时展示rss订阅最新消息
+[![Go Version](https://img.shields.io/badge/Go-1.18+-blue.svg)](https://golang.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Made with](https://img.shields.io/badge/Made%20with-Go%20%26%20Vue-brightgreen)](https://v3.vuejs.org/)
 
-## 特性
+一款高效、可配置的 RSS 聚合器。它不仅能自动抓取您订阅的内容，还能通过强大的关键词过滤系统，只将您真正关心的信息推送到指定渠道。搭配一个优雅、实时的 Web UI, 让信息获取变得前所未有的轻松和高效。
 
-***在原有代码调整了以下功能***
+![Project Screenshot](https://raw.githubusercontent.com/lcean/rss-reader/main/img/Snipaste_2024-03-24_12-25-10.png)
+*(动态、优雅的前端界面)*
 
-* 增加钉钉通知
-* 修改前端展示UI，参考(copy) [https://www.nodeseek.com/post-117926-1](https://www.nodeseek.com/post-117926-1) 这个大佬
-* 根据系统配置自动切换黑夜白天
-* 配置文件增加了自定义端口（没什么用，主要我本地开发80）
+---
 
-2023年7月28日，进行了界面改版和升级
+## ✨ 核心特性
 
-## TODO
+* **智能过滤**：为每个订阅源独立设置 `包含` 和 `排除` 关键词，实现精准的内容筛选。
+* **多源聚合**：通过一份 `config.json` 即可管理所有 RSS 订阅源，信息尽在掌握。
+* **多渠道推送**：无缝集成 **Telegram**, **飞书 (FeiShu)**, 和 **钉钉 (DingTalk)**，第一时间获取重要资讯。
+* **优雅的 Web UI**：
+    * 基于 Vue.js 和 Element Plus 构建，界面现代、美观。
+    * 通过 WebSocket 实现后端数据实时推送，内容更新无需刷新。
+    * 支持亮色/暗色模式自动切换，适应您的工作环境。
+    * 拥有卡片入场动画、悬停特效和长标题自动滚动等丰富的动态效果。
+* **自动化与高效率**：
+    * 后端定时任务自动刷新，无需人工干预。
+    * 增量更新机制，只处理新内容，性能卓越。
+    * 专业的格式化日志系统，分级、分类、高亮输出，便于监控和排错。
+* **配置热重载**：运行时可随时修改 `config.json`，应用会自动加载新配置，服务不中断。
+* **持久化归档**：记录已推送的文章，防止重复打扰。
 
-* [ ] 页面自定义提醒
+---
 
-## 预览
+## 🛠️ 技术栈
 
-![](pc.png)
+* **后端**: Go, Gorilla WebSocket, Gocron
+* **前端**: Vue.js 3, Element Plus, Three.js
+* **数据处理**: Go-feed, Fsnotify
 
-![](pc_night.png)
+---
 
-![](mobile.png)
+## 🚀 快速开始
+### 方式一：本地直接运行
 
-# 配置文件
+#### 1. 环境准备
 
-已提供 docker-compose 方式，可以一键完成安装启动运行 ***注意⚠：docker-compose.yml 中端口默认是9898***
+* 确保您已安装 [Go](https://golang.org/dl/) (版本 >= 1.18)。
+* 一个现代浏览器 (Chrome, Firefox, Edge, Safari)。
 
-部署前请先配置，配置都在 config.json 中修改，使用前请先去 config.json 中增加自己飞书机器人的webhook地址 或 Telegram 的 token 和 chat_id，注意⚠️ TG api 后面的地址不要改！ https://api.telegram.org/bot${token}/sendMessage ，也就是这个${token}保持原样别动
+#### 2. 下载与配置
 
-config.json 中的 refresh 单位为分钟，表示多少分钟请求一次所需的 rss 订阅源
+1.  克隆本项目到您的本地：
+    ```bash
+    git clone [https://github.com/lcean/rss-reader.git](https://github.com/lcean/rss-reader.git)
+    cd rss-reader
+    ```
 
-TG机器人创建和权限赋予教程请看 https://www.telegramhcn.com/article/161.html
-
-配置文件位于config.json，sources是RSS订阅链接，示例如下
-
-```json
-{
-    "port": 8080,
-    "values": [
-        "https://linux.do/latest.rss",
-        "https://rss.nodeseek.com",
-        "https://hostloc.com/forum.php?mod=rss&fid=45&auth=389ec3vtQanmEuRoghE%2FpZPWnYCPmvwWgSa7RsfjbQ%2BJpA%2F6y6eHAx%2FKqtmPOg",
-        "https://v2ex.com/feed/tab/tech.xml",
-        "https://www.dalao.net/feed.htm"
-    ],
-    "refresh": 5,
-    "autoUpdatePush": 7,
-    "listHeight": 600,
-    "webTitle": "Hello MJJ",
-    "webDes": "MJJ station",
-    "keywords": ["cc","cloudcone","rn","racknerd","咸鱼","4837","jpp","hk2p"],
-    "notify": {
-        "feishu": {
-            "api": ""
-        },
-        "dingtalk": {
-            "webhook": "",
-            "sign": ""
-        },
-        "telegram": {
-            "api": "https://api.telegram.org/bot${token}/sendMessage",
-            "chat_id": "",
-            "token": ""
+2.  **核心配置**：复制或重命名 `config.json.example` 为 `config.json`，并根据您的需求修改其内容。这是一个配置示例：
+    ```json
+    {
+      "ReFresh": 30, // 全局刷新频率（分钟）
+      "Port": "8080", // Web 服务端口
+      "Values": [
+        {
+          "Url": "[https://rss.nodeseek.com](https://rss.nodeseek.com)", // 订阅源地址
+          "MustContain": ["VPS", "服务器"], // 必须包含的关键词
+          "MustNotContain": ["测评", "教程"] // 必须排除的关键词
         }
-    },
-    "archives": "archives.txt"
-}
-```
-
-| 名称           | 说明                                                                                              |
-| -------------- | ------------------------------------------------------------------------------------------------- |
-| values         | rss订阅链接（必填）                                                                               |
-| refresh        | rss订阅更新时间间隔，单位分钟（必填）                                                             |
-| autoUpdatePush | 自动刷新间隔，默认为0，不开启。效果为前端每autoUpdatePush分钟自动更新页面信息，单位分钟（非必填） |
-
-# 使用方式
-
-## Docker部署
-
-环境要求：Git、Docker、Docker-Compose
-
-克隆项目
-
-```bash
-git clone https://github.com/okhanyu/rss-reader
-```
-
-进入rss-reader文件夹，运行项目
-
-```bash
-docker-compose up -d
-```
-
-国内服务器将Dockerfile中取消下面注释使用 go mod 镜像
-
-```dockerfile
-#RUN go env -w GO111MODULE=on && \
-#    go env -w GOPROXY=https://goproxy.cn,direct
-```
-
-部署成功后，通过ip+端口号访问
-
-# nginx反代
-
-这里需要注意/ws，若不设置proxy_read_timeout参数，则默认1分钟断开。静态文件增加gzip可以大幅压缩网络传输数据
-
-```conf
-server {
-    listen 443 ssl;
-    server_name 域名;
-    ssl_certificate  域名证书.cer;
-    ssl_certificate_key 域名证书.key;
-    gzip on;
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
-    location / {
-        proxy_pass  http://localhost:9898;
+      ],
+      "Notify": {
+        "Telegram": {
+          "Token": "YOUR_TELEGRAM_BOT_TOKEN", // 你的 Telegram Bot Token
+          "ChatId": "YOUR_TELEGRAM_CHAT_ID" // 你的 Telegram Chat ID
+        }
+        // ... 其他通知渠道配置
+      }
     }
-    location /ws {
-        proxy_pass http://localhost:9898/ws;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "Upgrade";
-        proxy_set_header Host $host;
-        proxy_read_timeout 300s;
-    }
-}
+    ```
+    * 详细的 `config.json` 配置说明，请参考 [**功能详解文档**](https://github.com/LceAn/RSS-Reader/tree/main/README/function.md)。
 
-server {
-    listen 80;
-    server_name 域名;
-    rewrite ^(.*)$ https://$host$1 permanent;
-}
+#### 3. 运行
+
+在项目根目录下，执行以下命令：
+```bash
+go run main.go
+````
+
+当您在控制台看到类似以下的日志时，表示服务已成功启动：
+
 ```
+2025-08-29 15:00:00 [INFO] [SYSTEM] - Server started on port: 8080
+```
+
+现在，打开您的浏览器并访问 `http://localhost:8080`，即可看到 RSS-Reader 的 Web 界面。
+
+
+### 方式二：使用 Docker (敬请期待)
+🐳 Docker 部署的相关 Dockerfile 和说明文档正在准备中，未来将支持一行命令快速启动，敬请期待！
+
+-----
+
+## 📂 项目文档
+
+  * [**功能详解 & 配置指南**](https://github.com/LceAn/RSS-Reader/tree/main/README/function.md)：深入了解 `config.json` 的所有配置项和高级用法。
+  * [**开发与更新日志**](https://github.com/LceAn/RSS-Reader/tree/main/README/README_update.md)：查看本项目从诞生至今的所有功能迭代和优化记录。
+
+-----
+
+## 📜 开源许可
+
+本项目采用 [MIT License](https://www.google.com/search?q=LICENSE) 开源许可。
+
