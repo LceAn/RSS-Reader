@@ -1,339 +1,273 @@
+/* ==========================================================================
+   Modern & Elegant RSS Reader Style by Gemini - V4 (Auto-Scroll Fixed)
+   ========================================================================== */
+
+/**
+ * 1. Design System: CSS Variables
+ * -------------------------------------------------------------------------- */
+ :root {
+    /* Color Palette (Light Mode) */
+    --bg-color: #f4f7f9;
+    --card-bg-color: #ffffff;
+    --text-color-primary: #333333;
+    --text-color-secondary: #6c757d;
+    --header-color: #212529;
+    --link-color: #007bff;
+    --link-hover-color: #0056b3;
+    --link-visited-color: #6a0dad;
+    --card-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+    --card-hover-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    --card-header-bg: #f8f9fa;
+    --card-header-border: #e9ecef;
+    --scrollbar-thumb-color: rgba(0, 0, 0, 0.2);
+
+    /* Typography */
+    --font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    --font-size-base: 16px;
+    --font-weight-bold: 600;
+
+    /* Spacing & Radius */
+    --spacing-unit: 1rem;
+    --border-radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        /* Color Palette (Dark Mode) */
+        --bg-color: #121212;
+        --card-bg-color: #1e1e1e;
+        --text-color-primary: #e0e0e0;
+        --text-color-secondary: #a0a0a0;
+        --header-color: #ffffff;
+        --link-color: #58a6ff;
+        --link-hover-color: #80bfff;
+        --link-visited-color: #c58af9;
+        --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+        --card-hover-shadow: 0 6px 25px rgba(0, 0, 0, 0.35);
+        --card-header-bg: #2a2a2a;
+        --card-header-border: #3a3a3a;
+        --scrollbar-thumb-color: rgba(255, 255, 255, 0.2);
+    }
+}
+
+
+/**
+ * 2. Keyframes for Animations
+ * -------------------------------------------------------------------------- */
+@keyframes fadeInSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Corrected: Keyframes for the auto-scrolling title effect */
+@keyframes marquee-scroll {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        /* This calculates the distance to scroll. It moves the text leftwards
+           by the width of the text itself, plus the padding of the parent. */
+        transform: translateX(calc(-100% + var(--spacing-unit) * 3));
+    }
+}
+
+
+/**
+ * 3. Base & Layout Styles
+ * -------------------------------------------------------------------------- */
 html {
     min-height: 100%;
 }
 
-:root {
-    --color-0: linear-gradient(to bottom, #ff4500, #f03000);
-    --color-1: linear-gradient(to bottom, #404040, #1a1a1a);
-    --color-2: linear-gradient(to bottom, #007f80, #007070);
-    --color-3: linear-gradient(to bottom, #393092, #30287b);
-    --color-4: linear-gradient(to bottom, #00aeef, #009dd6);
-    --color-5: linear-gradient(to bottom, #87179d, #6e1381);
-}
-
 body {
-    font-family: 微软雅黑, "Avenir", Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color-primary);
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-base);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-align: center;
-    color: #2c3e50;
-    margin-top: 30px;
+    margin: 0;
+    padding-top: calc(var(--spacing-unit) * 2);
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 #app {
     max-width: 1600px;
     margin: 0 auto;
+    padding: 0 var(--spacing-unit);
 }
 
-.el-scrollbar:hover:after {
-    opacity: 1;
+.el-header h1 {
+    color: var(--header-color);
+    font-weight: var(--font-weight-bold);
+    animation: fadeInSlideUp 0.6s ease-out forwards;
 }
 
-.el-scrollbar:after {
-    content: "";
-    position: absolute;
-    height: 18px;
-    pointer-events: none;
-    display: block;
-    width: 100%;
-    bottom: 0;
+
+/**
+ * 4. Card Component Styles & Animations
+ * -------------------------------------------------------------------------- */
+.feed-col {
+    margin-bottom: calc(var(--spacing-unit) * 1.5);
     opacity: 0;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.1), transparent);
-    transition: opacity 0.2s ease;
-    border-radius: 0 0 6px 6px;
+    animation: fadeInSlideUp 0.6s ease-out forwards;
+}
+
+.feed-col:nth-child(1) { animation-delay: 0.1s; }
+.feed-col:nth-child(2) { animation-delay: 0.15s; }
+.feed-col:nth-child(3) { animation-delay: 0.2s; }
+.feed-col:nth-child(4) { animation-delay: 0.25s; }
+.feed-col:nth-child(5) { animation-delay: 0.3s; }
+.feed-col:nth-child(6) { animation-delay: 0.35s; }
+
+.el-card {
+    background: var(--card-bg-color);
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), 
+                box-shadow 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.el-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: var(--card-hover-shadow);
 }
 
 .card-header {
-    font-size: 18px;
-    font-weight: bold;
+    position: relative;
+    padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.25);
+    font-size: 1.1rem;
+    font-weight: var(--font-weight-bold);
+    color: var(--text-color-primary);
+    background-color: var(--card-header-bg);
+    border-bottom: 1px solid var(--card-header-border);
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    text-align: left;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-    text-align: left;
-    margin-bottom: 10px;
-    color: white;
-    height: 2.4em;
-    border-radius: 6px;
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05), 0 2px 2px -1px rgba(0, 0, 0, 0.2);
-    padding: 4px 0.5em 0;
-    position: relative;
-}
-
-#app > section > main > div > div:nth-child(6n+1) > div > div > div.card-header {
-    background: var(--color-0);
-}
-
-#app > section > main > div > div:nth-child(6n+2) > div > div > div.card-header {
-    background: var(--color-1);
-}
-
-#app > section > main > div > div:nth-child(6n+3) > div > div > div.card-header {
-    background: var(--color-2);
-}
-
-#app > section > main > div > div:nth-child(6n+4) > div > div > div.card-header {
-    background: var(--color-3);
-}
-
-#app > section > main > div > div:nth-child(6n+5) > div > div > div.card-header {
-    background: var(--color-4);
-}
-
-#app > section > main > div > div:nth-child(6n) > div > div > div.card-header {
-    background: var(--color-5);
 }
 
 .card-header > time {
     display: block;
     position: absolute;
-    font-size: 10px;
-    top: 28px;
-    color: #dfdfdf;
+    top: 50%;
+    right: calc(var(--spacing-unit) * 1.25);
+    transform: translateY(-50%);
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--text-color-secondary);
 }
 
-.list-item {
-    display: flex;
-    align-items: center;
-    text-align: left;
-    width: 100%;
+
+/**
+ * 5. List, Link Styles & Auto-Scroll Feature
+ * -------------------------------------------------------------------------- */
+.el-card__body {
+    padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 0.75);
 }
 
 .list-item-title {
-    display: block;
-    overflow: hidden;
-    text-align: left;
-    margin-bottom: 8px;
-    cursor: pointer;
-    color: #0060a0;
-    text-decoration: none;
-    padding: 0 0.5em;
     position: relative;
+    padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 1.5);
+    text-align: left;
+    /* Corrected: The direct parent of the scrolling element needs to be the mask. */
+    overflow: hidden;
 }
 
 .list-item-title::before {
-    content: "· ";
+    content: "•";
     position: absolute;
-    margin-left: -1rem;
-    color: #0060a0;
-    cursor: pointer;
+    left: calc(var(--spacing-unit) * 0.5);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-color-secondary);
+    font-size: 1rem;
 }
 
-.title-link {
+.el-link {
     display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-align: left;
-}
-
-a {
-    color: black;
-    text-decoration: none;
-}
-
-.feed-col {
-    margin-bottom: 20px;
-}
-
-.el-card.is-always-shadow {
-    box-shadow: none;
-}
-
-.el-card {
-    border: none;
-    background: none;
+    width: 100%;
 }
 
 .el-link__inner {
-    display: inline;
-    color: #0060a0;
-    padding-left: .6em;
+    /* Corrected: Removed max-width and overflow to allow text to be naturally long. */
+    display: inline-block;
+    white-space: nowrap;
+    vertical-align: middle;
+    /* The animation will handle the scrolling */
+    transform: translateX(0); /* Set initial position */
+    transition: transform 0.2s ease; /* Smooth transition for non-scrolling cases */
 }
 
-* {
-    transition: .2s ease-out;
+/* The core of the auto-scroll magic, now corrected */
+.list-item-title:hover .el-link__inner {
+    /* Animation speed is calculated based on an assumption of average title length.
+       8s is a good starting point. Increase for slower scroll, decrease for faster. */
+    animation: marquee-scroll 8s linear 0.5s infinite alternate; /* 0.5s delay before starting */
 }
 
-*:hover {
+
+a, .el-link {
+    color: var(--link-color);
     text-decoration: none;
-}
-
-.el-card__body {
-    padding: 0;
+    transition: color 0.2s ease-out;
 }
 
 .el-link:hover {
-    transform: translateX(4px);
-    color: #b03000
+    color: var(--link-hover-color);
+}
+
+a:visited, .el-link:visited {
+    color: var(--link-visited-color);
+    opacity: 0.85;
 }
 
 .el-link.is-underline:hover:after {
     border: none;
 }
 
-@media (prefers-color-scheme: dark) {
-    body {
-        font-family: 微软雅黑, "Avenir", Helvetica, Arial, sans-serif;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-        text-align: center;
-        color: #2c3e50;
-        margin-top: 30px;
-        background: rgb(20, 29, 43);
-    }
 
-    #app {
-        max-width: 1600px;
-        margin: 0 auto;
-    }
+/**
+ * 6. Scrollbar Styles
+ * -------------------------------------------------------------------------- */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
 
-    .el-header {
-        color: rgb(159, 239, 0);
-    }
+::-webkit-scrollbar-track {
+    background: transparent;
+}
 
-    .el-scrollbar:hover:after {
-        opacity: 1;
-    }
+::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb-color);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
 
-    .el-scrollbar:after {
-        content: "";
-        position: absolute;
-        height: 18px;
-        pointer-events: none;
-        display: block;
-        width: 100%;
-        bottom: 0;
-        opacity: 0;
-        background: linear-gradient(to top, rgba(0, 0, 0, 0.1), transparent);
-        transition: opacity 0.2s ease;
-        border-radius: 0 0 6px 6px;
-    }
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-color-secondary);
+}
 
-    .card-header {
-        font-size: 18px;
-        font-weight: bold;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        text-align: left;
-        margin-bottom: 10px;
-        color: rgb(159, 239, 0);
-        line-height: 2.4em;
-        padding: 0 0.8em 0.4em;
-        position: relative;
-    }
-
-    .card-header > time {
-        display: block;
-        position: absolute;
-        font-size: 10px;
-        top: 20px;
-        color: #768961;
-    }
-
-    .list-item {
-        display: flex;
-        align-items: center;
-        text-align: left;
-        width: 100%;
-    }
-
-    .list-item-title {
-        display: block;
-        overflow: hidden;
-        text-align: left;
-        margin-bottom: 8px;
-        cursor: pointer;
-        color: #0060a0;
-        text-decoration: none;
-        padding: 0 0.5em;
-        position: relative;
-    }
-
-    #app > section > main > div > div:nth-child(6n+1) > div > div > div.card-header {
-        background: none;
-    }
-
-    #app > section > main > div > div:nth-child(6n+2) > div > div > div.card-header {
-        background: none;
-    }
-
-    #app > section > main > div > div:nth-child(6n+3) > div > div > div.card-header {
-        background: none;
-    }
-
-    #app > section > main > div > div:nth-child(6n+4) > div > div > div.card-header {
-        background: none;
-    }
-
-    #app > section > main > div > div:nth-child(6n+5) > div > div > div.card-header {
-        background: none;
-    }
-
-    #app > section > main > div > div:nth-child(6n) > div > div > div.card-header {
-        background: none;
-    }
-
-    .list-item-title::before {
-        content: "►";
-        position: absolute;
-        margin-left: -1rem;
-        color: rgb(159, 239, 0);
-        cursor: pointer;
-    }
-
-    .title-link {
-        display: block;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        text-align: left;
-    }
-
-    a {
-        color: black;
-        text-decoration: none;
-    }
-
-    .feed-col {
-        margin-bottom: 20px;
-    }
-
-    .el-card.is-always-shadow {
-        box-shadow: rgb(15, 22, 32) 4px 4px 0px;
-    }
-
-    .el-card {
-        border: none;
-        background: rgb(26, 35, 50);
-        border-radius: 8px;
-    }
-
-    .el-link__inner {
-        display: inline;
-        color: #c3c3c3;
-        text-align: justify;
-        padding-left: 1.4em;
-    }
-
-    .el-link {
-        transition: .2s ease-out;
-    }
-
-    *:hover {
-        text-decoration: none;
-    }
-
-    .el-card__body {
-        padding: 0;
-    }
-
-    .el-link:hover {
-        transform: translateX(4px);
-        color: #b03000
-    }
-
-    .el-link.is-underline:hover:after {
-        border: none;
-    }
+.el-scrollbar:after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 24px;
+    background: linear-gradient(to top, var(--card-bg-color) 20%, transparent);
+    pointer-events: none;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+    opacity: 1;
 }
