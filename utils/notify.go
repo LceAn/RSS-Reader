@@ -41,9 +41,15 @@ type FeiShuMessageText struct {
 	Text string `json:"text"`
 }
 
+// type TelegramMessage struct {
+// 	ChatId string `json:"chat_id"`
+// 	Text   string `json:"text"`
+// }
+
 type TelegramMessage struct {
-	ChatId string `json:"chat_id"`
-	Text   string `json:"text"`
+    ChatId    string `json:"chat_id"`
+    Text      string `json:"text"`
+    ParseMode string `json:"parse_mode,omitempty"`
 }
 
 type DingtalkMessage struct {
@@ -83,17 +89,18 @@ func Notify(msg Message) {
 	}
 }
 func sendToTelegram(msg Message) {
-	finalMsg, err := json.Marshal(
-		TelegramMessage{
-			ChatId: globals.RssUrls.Notify.Telegram.ChatId,
-			Text:   msg.Content,
-		})
-	if err != nil {
-		log.Printf("json marshal err: %+v\n", err)
-		return
-	}
-	api := strings.ReplaceAll(globals.RssUrls.Notify.Telegram.API, TokenReplace, globals.RssUrls.Notify.Telegram.Token)
-	requestPost(api, finalMsg)
+    finalMsg, err := json.Marshal(
+        TelegramMessage{
+            ChatId:    globals.RssUrls.Notify.Telegram.ChatId,
+            Text:      msg.Content,
+            ParseMode: "MarkdownV2", // 告诉 Telegram 使用 Markdown V2 解析
+        })
+    if err != nil {
+        log.Printf("json marshal err: %+v\n", err)
+        return
+    }
+    api := strings.ReplaceAll(globals.RssUrls.Notify.Telegram.API, TokenReplace, globals.RssUrls.Notify.Telegram.Token)
+    requestPost(api, finalMsg)
 }
 
 func sendToDingtalk(msg Message) {

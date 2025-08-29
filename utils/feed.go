@@ -12,6 +12,17 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
+func escapeMarkdownV2(text string) string {
+    replacer := strings.NewReplacer(
+        "_", "\\_", "*", "\\*", "[", "\\[", "]", "\\]", "(",
+        "\\(", ")", "\\)", "~", "\\~", "`", "\\`", ">",
+        "\\>", "#", "\\#", "+", "\\+", "-", "\\-", "=",
+        "\\=", "|", "\\|", "{", "\\{", "}", "\\}", ".",
+        "\\.", "!", "\\!",
+    )
+    return replacer.Replace(text)
+}
+
 func UpdateFeeds() {
 	var (
 		tick = time.Tick(time.Duration(globals.RssUrls.ReFresh) * time.Minute)
@@ -147,12 +158,40 @@ func Check(url string, result *gofeed.Feed, v *gofeed.Item) {
 				return
 			} else {
 				globals.Hash[link] = 1
-				// 发送通知
+		
+				// --- 修改开始 ---
+		
+				// 1. 为 Markdown V2 准备需要转义的文本
+				title := escapeMarkdownV2(v.Title)
+				source := escapeMarkdownV2(result.Title)
+				link := v.Link // 链接URL本身不需要转义
+
+				// 2. 【新增】获取并格式化文章的发布时间
+				publishTime := v.PublishedParsed
+				if publishTime == nil { // 如果文章没有提供发布时间，则使用当前时间
+					now := time.Now()
+					publishTime = &now
+				}
+				timeString := escapeMarkdownV2(publishTime.Format("2006-01-02 15:04"))
+
+				// 3. 构建包含【时间】的完整 Markdown 消息
+				content := fmt.Sprintf(
+					"*%s*\n\n*来源*：%s\n*时间*：%s\n[点击阅读原文](%s)",
+					title,
+					source,
+					timeString, // 将格式化后的时间添加到消息中
+					link,
+				)
+
+				// 4. 发送通知
 				go Notify(Message{
 					Routes:   []string{FeiShuRoute, TelegramRoute, DingtalkRoute},
-					Content:  fmt.Sprintf("%s\n%s", msg, v.Link),
+					Content:  content,
 					FeedItem: *v,
 				})
+		
+				// --- 修改结束 ---
+		
 				globals.WriteFile(globals.RssUrls.Archives, link)
 			}
 		})
