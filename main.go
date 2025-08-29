@@ -33,6 +33,10 @@ func main() {
 	http.Handle("/static/", fs)
 	port := globals.RssUrls.Port
 	serve := fmt.Sprintf("%s%d", ":", port)
+	utils.System("服务启动中...")
+    utils.System("网页监听地址为: http://localhost:%d", port)
+    utils.System("按 CTRL+C 退出程序.")
+
 	if err := http.ListenAndServe(serve, nil); err != nil {
 		utils.NewLogger("SYSTEM").Fatal("启动服务器失败: %v", err)
 	}

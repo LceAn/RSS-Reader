@@ -101,7 +101,7 @@ go run main.go
 ## 📂 项目文档
 
   * [**功能详解 & 配置指南**](https://github.com/LceAn/RSS-Reader/tree/main/README/function.md)：深入了解 `config.json` 的所有配置项和高级用法。
-  * [**开发与更新日志**](https://github.com/LceAn/RSS-Reader/tree/main/README/README_update.md)：查看本项目从诞生至今的所有功能迭代和优化记录。
+  * [**开发与更新日志**](https://github.com/LceAn/RSS-Reader/tree/main/README/update.md)：查看本项目从诞生至今的所有功能迭代和优化记录。
 
 -----
 
