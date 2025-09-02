@@ -21,11 +21,12 @@ func main() {
 	go utils.UpdateFeeds()
 	go utils.WatchConfigFileChanges("config.json")
 
+	// 恢复您所有的路由
 	http.HandleFunc("/", tplHandler)
 	http.Handle("/static/", http.FileServer(http.FS(globals.DirStatic)))
 	http.HandleFunc("/feeds", getFeedsHandler)
 	http.HandleFunc("/ws", wsHandler)
-	http.HandleFunc("/api/config", configHandler)
+	http.HandleFunc("/api/config", configHandler) // 保留您原始的 config API
 
 	port := globals.RssUrls.Port
 	listenAddress := fmt.Sprintf(":%d", port)
@@ -39,6 +40,7 @@ func main() {
 	}
 }
 
+// tplHandler 保持您原有的、功能更强的版本
 func tplHandler(w http.ResponseWriter, r *http.Request) {
 	tmplInstance := template.New("index.html").Delims("<<", ">>")
 	funcMap := template.FuncMap{
@@ -110,9 +112,6 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	wsLogger := utils.NewLogger("WEBSOCKET")
 	wsLogger.Info("Connection opened from %s", r.RemoteAddr)
 
-	// --- 修正开始 ---
-
-	// 1. 立即发送一次初始 Feed 数据
 	initialFeeds := utils.GetFeeds()
 	if len(initialFeeds) > 0 {
 		if err := conn.WriteJSON(map[string]interface{}{
@@ -124,8 +123,6 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	lastSentFeeds := initialFeeds
-
-	// --- 修正结束 ---
 
 	statusTicker := time.NewTicker(1 * time.Second)
 	defer statusTicker.Stop()

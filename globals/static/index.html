@@ -39,22 +39,62 @@
             <button id="settings-btn" @click="toggleSettings"> ⚙ </button>
             <transition name="popup">
                 <div v-if="showSettings" class="settings-panel">
-                    <h2>Settings</h2>
-                    <div>
-                        <label>Port:</label>
-                        <input type="text" v-model="config.port">
+                    <div class="settings-header">
+                        <h2>配置中心</h2>
+                        <button class="close-btn" @click="toggleSettings">×</button>
                     </div>
-                    <div>
-                        <button @click="updateConfig">Save Changes</button>
-                        <button @click="toggleSettings">Close</button>
+
+                    <div class="settings-section">
+                        <h4>通用设置</h4>
+                        <ul>
+                            <li><span>服务端口</span><strong>{{ config.Port }}</strong></li>
+                            <li><span>刷新频率</span><strong>{{ config.ReFresh }} 分钟</strong></li>
+                            <li><span>前端推送</span><strong :class="config.AutoUpdatePush > 0 ? 'is-enabled' : ''">{{ config.AutoUpdatePush > 0 ? '启用' : '禁用' }}</strong></li>
+                            <li><span>卡片高度</span><strong>{{ config.ListHeight }} px</strong></li>
+                        </ul>
+                    </div>
+
+                    <div class="settings-section">
+                        <h4>订阅源</h4>
+                        <ul class="feed-list" v-if="config.Values && config.Values.length > 0">
+                            <li v-for="feed in config.Values">
+                                <p class="feed-url">{{ feed.Url }}</p>
+                                <div class="keywords">
+                                    <span v-if="feed.MustContain && feed.MustContain.length > 0" class="tag-group">
+                                        <strong>包含:</strong>
+                                        <span v-for="keyword in feed.MustContain" class="tag include">{{ keyword }}</span>
+                                    </span>
+                                    <span v-if="feed.MustNotContain && feed.MustNotContain.length > 0" class="tag-group">
+                                        <strong>排除:</strong>
+                                        <span v-for="keyword in feed.MustNotContain" class="tag exclude">{{ keyword }}</span>
+                                    </span>
+                                </div>
+                            </li>
+                        </ul>
+                        <p v-else>暂无订阅源配置。</p>
+                    </div>
+
+                    <div class="settings-section">
+                        <h4>通知渠道</h4>
+                        <ul>
+                            <li>
+                                <span>Telegram</span>
+                                <strong v-if="config.Notify && config.Notify.Telegram && config.Notify.Telegram.Token" class="is-enabled">
+                                    已配置
+                                </strong>
+                                <strong v-else>未配置</strong>
+                            </li>
+                        </ul>
                     </div>
                 </div>
             </transition>
 
         </el-header>
+        
         <el-main v-loading.fullscreen.lock="fullscreenLoading" element-loading-text="拼命加载中">
             <el-row :gutter="20">
-                << $root := . >> << range $index, $feed := .RssDataList >>
+                << $root := . >>
+                << range $index, $feed := .RssDataList >>
                 <el-col v-if="showSEOFlag" :xs="24" :sm="12" :md="8" :lg="6" :key="$index" class="feed-col">
                     <el-card class="box-card">
                         <div slot="header" class="card-header">
@@ -97,6 +137,7 @@
                 </el-col>
             </el-row>
         </el-main>
+
         <el-footer>
             <el-link href="<< .Github_project_url >>" target="_blank"><< .Github_project_url_name>></el-link>
             <el-link href="<< .Github_author_url >>" target="_blank"><< .Github_author_url_name>></el-link>
@@ -227,24 +268,23 @@
         methods: {
             toggleSettings() {
                 this.showSettings = !this.showSettings;
+                if (this.showSettings) {
+                    this.getConfig();
+                }
             },
             getConfig() {
-                // In a real app, you would fetch this from an API
-                // For now, we can use placeholder data
-                this.config = { port: '8080' };
+                fetch('/api/config')
+                    .then(response => response.json())
+                    .then(data => {
+                        this.config = data;
+                    })
+                    .catch(error => console.error("Error fetching config:", error));
             },
-            updateConfig() {
-                // In a real app, you would send this to an API
-                console.log("Saving config:", this.config);
-                alert('Configuration Updated (simulated)');
-                this.showSettings = false;
-            }
         },
         mounted() {
             this.fullscreenLoading = false;
             this.isPc = !window.matchMedia('(max-width: 767px)').matches;
-            this.getConfig();
-
+            
             const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
             const connect = () => {
                 const socket = new WebSocket(protocol + window.location.host + "/ws");
@@ -255,7 +295,7 @@
                     } else if (message.type === 'feeds' && message.data) {
                         this.feeds = message.data;
                         this.showSEOFlag = false;
-                    } else if (Array.isArray(message)) { // Fallback for older server versions
+                    } else if (Array.isArray(message)) {
                         this.feeds = message;
                         this.showSEOFlag = false;
                     }
@@ -264,14 +304,12 @@
                 const reloadHtml = () => {
                     if (socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
                         if (document.visibilityState === 'visible') {
-                            console.log("WebSocket closed. Reloading page.");
                             location.reload();
                         }
                     }
                 }
                 socket.onclose = () => {
                     if (this.isPc && this.autoUpdatePush > 0) {
-                        console.log("WebSocket connection closed. Attempting to reconnect...");
                         setInterval(reloadHtml, 3000);
                     }
                 };

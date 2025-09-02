@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Modern & Elegant RSS Reader Style by Gemini - V10 (Status Indicator)
+   Modern & Elegant RSS Reader Style by Gemini - V17 (Stable Read-only Settings)
    ========================================================================== */
 
 /**
@@ -90,7 +90,6 @@
     50% { transform: scale(1.2); opacity: 1; }
 }
 
-/* Vue Transition Classes for the popup */
 .popup-enter-active, .popup-leave-active {
     transition: opacity 0.2s ease, transform 0.2s ease;
 }
@@ -103,32 +102,32 @@
 /**
  * 3. Base & Layout Styles
  * -------------------------------------------------------------------------- */
-html { min-height: 100%; }
+html {
+    height: 100%;
+}
 
 body {
     background-color: var(--bg-color);
     color: var(--text-color-primary);
     font-family: var(--font-family-base);
-    font-size: var(--font-size-base);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    text-align: center;
     margin: 0;
-    padding-top: calc(var(--spacing-unit) * 2);
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 #app {
     max-width: 1600px;
     margin: 0 auto;
-    padding: 0 var(--spacing-unit);
+    padding: calc(var(--spacing-unit) * 2) var(--spacing-unit);
 }
 
 .el-header {
     display: flex;
     justify-content: center;
     align-items: center;
-    position: relative; /* Needed for absolute positioning of children */
+    position: relative;
+    padding-top: 0;
 }
 
 .el-header h1 {
@@ -167,7 +166,7 @@ body {
 
 
 /**
- * 4. Status Indicator & Settings Button
+ * 4. Status Indicator & Settings
  * -------------------------------------------------------------------------- */
 .status-container {
     position: absolute;
@@ -214,11 +213,7 @@ body {
     border-bottom: 1px solid var(--card-header-border);
     padding-bottom: calc(var(--spacing-unit) * 0.5);
 }
-.status-popup ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
+.status-popup ul { list-style: none; padding: 0; margin: 0; }
 .status-popup li {
     display: flex;
     justify-content: space-between;
@@ -227,13 +222,8 @@ body {
     color: var(--text-color-secondary);
     padding: calc(var(--spacing-unit) * 0.3) 0;
 }
-.status-popup li strong {
-    color: var(--text-color-primary);
-    font-weight: 600;
-}
-.status-popup li strong.has-error {
-    color: var(--status-warn-color);
-}
+.status-popup li strong { color: var(--text-color-primary); font-weight: 600; }
+.status-popup li strong.has-error { color: var(--status-warn-color); }
 .status-popup .countdown {
     margin-top: var(--spacing-unit);
     padding-top: calc(var(--spacing-unit) * 0.5);
@@ -263,18 +253,68 @@ body {
 
 .settings-panel {
     position: absolute;
-    top: 70px;
+    top: 20px;
     right: 20px;
-    background-color: var(--card-bg-color);
-    padding: 20px;
+    width: 450px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: var(--card-bg-color);
+    padding: 0;
     border-radius: var(--border-radius);
     box-shadow: var(--card-hover-shadow);
     z-index: 100;
+    text-align: left;
+}
+.settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.25);
+    border-bottom: 1px solid var(--card-header-border);
+    position: sticky;
+    top: 0;
+    background: var(--card-bg-color);
+    z-index: 2;
+}
+.settings-header h2 { margin: 0; font-size: 1.2rem; }
+.close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-color-secondary); padding: 0; line-height: 1; }
+.settings-section {
+    padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.25);
+    border-bottom: 1px solid var(--list-item-border-color);
+}
+.settings-section:last-child { border-bottom: none; }
+.settings-section h4 { margin: 0 0 var(--spacing-unit) 0; font-size: 1rem; color: var(--text-color-secondary); }
+.settings-section ul { list-style: none; padding: 0; margin: 0; }
+.settings-section li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: calc(var(--spacing-unit) * 0.5) 0;
+    font-size: 0.95rem;
+}
+.settings-section strong { font-weight: 600; }
+.settings-section strong.is-enabled { color: var(--status-ok-color); }
+.feed-list li {
+    flex-direction: column;
+    align-items: flex-start;
+    border-top: 1px solid var(--list-item-border-color);
+    padding-top: var(--spacing-unit);
+}
+.feed-list li:first-child { border-top: none; }
+.feed-url { font-family: monospace; font-size: 0.9rem; word-break: break-all; margin: 0 0 calc(var(--spacing-unit) * 0.5) 0; }
+.keywords { display: flex; flex-direction: column; gap: 8px; }
+.tag-group { display: flex; align-items: center; gap: 6px; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 500; }
+.tag.include { background-color: rgba(40, 167, 69, 0.1); color: #28a745; }
+.tag.exclude { background-color: rgba(220, 53, 69, 0.1); color: #dc3545; }
+@media (prefers-color-scheme: dark) {
+    .tag.include { background-color: rgba(72, 199, 142, 0.2); color: #48c78e; }
+    .tag.exclude { background-color: rgba(255, 107, 107, 0.2); color: #ff6b6b; }
 }
 
 
 /**
- * 5. Card Component Styles
+ * 5. Card, List, and other styles
  * -------------------------------------------------------------------------- */
 .feed-col {
     margin-bottom: calc(var(--spacing-unit) * 1.5);
@@ -329,10 +369,6 @@ body {
     color: var(--text-color-secondary);
 }
 
-
-/**
- * 6. Modernized List & Link Styles
- * -------------------------------------------------------------------------- */
 .el-card__body {
     padding: calc(var(--spacing-unit) * 0.5) 0;
 }
@@ -404,24 +440,21 @@ a:visited, .el-link:visited {
 
 
 /**
- * 7. Scrollbar Styles
+ * 6. Scrollbar Styles
  * -------------------------------------------------------------------------- */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
-
 ::-webkit-scrollbar-track {
     background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
     background-color: var(--scrollbar-thumb-color);
     border-radius: 10px;
     border: 2px solid transparent;
     background-clip: content-box;
 }
-
 ::-webkit-scrollbar-thumb:hover {
     background-color: var(--text-color-secondary);
 }
@@ -441,7 +474,7 @@ a:visited, .el-link:visited {
 
 
 /**
- * 8. Refined Footer Styles
+ * 7. Refined Footer Styles
  * -------------------------------------------------------------------------- */
 .el-footer {
     display: flex;
