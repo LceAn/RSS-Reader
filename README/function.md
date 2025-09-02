@@ -130,3 +130,70 @@ titlele
 3.  **通知与结果**：当 `feed.go` 中的 `Check` 函数确认有新内容且关键词匹配成功后，会调用 `utils/notify.go` 中的函数。
 4.  **最终输出**：`notify.go` 在尝试发送通知后，会**将远程 API 的返回结果打印成日志**，这是判断通知是否成功发出的关键依据。
 5.  **所有日志**：最终都会通过 Go 内置的 `log` 包输出到您运行程序的控制台界面。
+
+## 持久化归档功能
+
+`archives.txt` 文件是项目的**持久化归档数据库**，它的核心作用是**防止程序在重启后，对同一篇文章发送重复的通知**。
+
+简单来说，它就是一个“**已发送通知历史记录**”文件。
+
+-----
+
+### 它是如何工作的？
+
+整个流程涉及到两个文件：`globals/global.go`（负责读写文件）和 `utils/feed.go`（负责业务逻辑）。
+
+#### 1\. 程序启动阶段：加载历史记录
+
+  * **文件**: `globals/global.go`
+  * **函数**: `Init()`
+  * **逻辑**: 当您的程序一启动，`globals.Init()` 函数就会被调用。在这个函数里，程序会读取 `archives.txt` 文件的**全部内容**。然后，它会把文件里的**每一行（也就是每一个已发送过的文章链接）**，都加载到一个名为 `globals.Hash` 的内存哈希表（map）中。
+  * **结果**: 这样，程序在内存里就有了一份快速、高效的“已发送链接”的临时数据库。
+
+#### 2\. 核心处理阶段：检查与追加
+
+  * **文件**: `utils/feed.go`
+  * **函数**: `Check(...)`
+  * **逻辑**: 这是整个流程最关键的地方。
+    1.  当 `UpdateFeeds` 定时任务抓取到一篇新文章时，会调用 `Check` 函数来处理它。
+    2.  在 `Check` 函数内部，程序首先会清理这篇文章的链接（`v.Link`），去除网址参数等无关信息。
+    3.  然后，它会立即检查这个清理后的链接是否存在于我们第一步加载到内存的 `globals.Hash` 哈希表中 (`_, fileCacheOk := globals.Hash[link]`)。
+    4.  **如果链接已存在** (`if fileCacheOk`)，说明这篇文章我们过去已经发送过通知了。程序会立刻 `return`，**停止后续所有操作**，从而避免了重复发送。
+    5.  **如果链接不存在**，程序会继续进行关键词匹配 (`MatchStr`)。
+    6.  如果关键词匹配成功，程序会执行以下两个核心操作：
+          * **发送通知**：`go Notify(...)`
+          * **写入归档**：`globals.WriteFile(globals.RssUrls.Archives, link)`
+
+#### 3\. 写入文件阶段：追加内容
+
+  * **文件**: `globals/global.go`
+  * **函数**: `WriteFile(...)`
+  * **逻辑**:
+      * `utils/feed.go` 调用的 `globals.WriteFile` 函数，会以\*\*追加模式（append）\*\*打开 `archives.txt` 文件。
+      * 然后，它会将刚刚成功发送通知的那篇文章的链接，作为**新的一行**写入到文件的末尾。
+      * 同时，这个链接也会被添加到内存中的 `globals.Hash` 哈希表里，确保在程序运行期间也不会重复处理。
+
+**代码摘要 (`utils/feed.go`):**
+
+```go
+        // 匹配关键词
+        MatchStr(v.Title, func(msg string) {
+            _, fileCacheOk = globals.Hash[link]
+            if fileCacheOk {
+                return // 如果内存中已存在，则不处理
+            } else {
+                globals.Hash[link] = 1 // 加入内存缓存
+                // 发送通知
+                go Notify(Message{
+                    Routes:   []string{FeiShuRoute, TelegramRoute, DingtalkRoute},
+                    Content:  fmt.Sprintf("%s\n%s", msg, v.Link),
+                    FeedItem: *v,
+                })
+                // 将链接写入 archives.txt 文件
+                globals.WriteFile(globals.RssUrls.Archives, link)
+            }
+        })
+```
+
+**总结一下**：`archives.txt` 是项目实现“幂等性”（即多次执行相同操作，结果都一样）的关键。没有它，每次重启程序，都会把所有 RSS 源里的文章当成新的来处理一遍，从而导致通知泛滥。
+
