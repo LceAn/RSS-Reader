@@ -109,3 +109,29 @@ go run main.go
 
 本项目采用 [MIT License](https://www.google.com/search?q=LICENSE) 开源许可。
 
+---
+
+## 仓库结构
+
+- `.vscode/`
+- `LICENSE`
+- `README.md`
+- `README/`
+- `archives.txt`
+- `config.json`
+- `globals/`
+- `go.mod`
+- `go.sum`
+- `main.go`
+- `models/`
+- `utils/`
+
+<!-- repo-readme-standard:v1 -->
+## 仓库维护信息
+
+- 项目类型：其他
+- 当前状态：待复盘
+- 可见性：public
+- 维护节奏：按需要复盘
+- 相关仓库：无已确认的重复仓库关系；如需合并请先核对功能边界。
+- 维护边界：普通文档和代码更新可直接提交；归档、删除、历史重写或强制推送需单独确认。
