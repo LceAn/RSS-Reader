@@ -1,16 +1,16 @@
 package utils
 
 import (
-	"rss-reader/globals"
 	"strings"
 )
 
-func MatchStr(str string, callback func(string)) {
-	for _, v := range globals.MatchList {
-		strFinal := strings.ToLower(strings.TrimSpace(str))
-		v = strings.ToLower(strings.TrimSpace(v))
-		if strings.Contains(strFinal, v) {
-			callback(str)
+func Matches(text string, keywords []string) bool {
+	normalizedText := strings.ToLower(strings.TrimSpace(text))
+	for _, keyword := range keywords {
+		normalizedKeyword := strings.ToLower(strings.TrimSpace(keyword))
+		if normalizedKeyword != "" && strings.Contains(normalizedText, normalizedKeyword) {
+			return true
 		}
 	}
+	return false
 }

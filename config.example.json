@@ -1,0 +1,32 @@
+{
+    "host": "127.0.0.1",
+    "port": 8080,
+    "values": [],
+    "refresh": 5,
+    "autoUpdatePush": 1,
+    "listHeight": 600,
+    "webTitle": "RSS Reader",
+    "webDes": "My RSS subscriptions",
+    "github_project_url": "https://github.com/example/rss-reader",
+    "github_project_url_name": "rss-reader",
+    "github_author_url": "https://github.com/example",
+    "github_author_url_name": "example",
+    "keywords": [
+        "keyword"
+    ],
+    "notify": {
+        "feishu": {
+            "api": ""
+        },
+        "dingtalk": {
+            "webhook": "",
+            "sign": ""
+        },
+        "telegram": {
+            "api": "https://api.telegram.org/bot${token}/sendMessage",
+            "chat_id": "",
+            "token": ""
+        }
+    },
+    "archives": "archives.txt"
+}

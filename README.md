@@ -1,130 +1,174 @@
-# 🍃 RSS-Reader：您的智能信息过滤与推送中心
+<div align="center">
 
-[![Go Version](https://img.shields.io/badge/Go-1.18+-blue.svg)](https://golang.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Made with](https://img.shields.io/badge/Made%20with-Go%20%26%20Vue-brightgreen)](https://v3.vuejs.org/)
+# RSS Reader
 
-一款高效、可配置的 RSS 聚合器。它不仅能自动抓取您订阅的内容，还能通过强大的关键词过滤系统，只将您真正关心的信息推送到指定渠道。搭配一个优雅、实时的 Web UI, 让信息获取变得前所未有的轻松和高效。
+轻量、自托管的 RSS 聚合与关键词通知服务
 
-![Project Screenshot](https://raw.githubusercontent.com/lcean/rss-reader/main/img/Snipaste_2024-03-24_12-25-10.png)
-*(动态、优雅的前端界面)*
+[![CI](https://github.com/LceAn/RSS-Reader/actions/workflows/ci.yml/badge.svg)](https://github.com/LceAn/RSS-Reader/actions/workflows/ci.yml)
+[![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
+[![License](https://img.shields.io/badge/License-MIT-2f855a.svg)](LICENSE)
 
----
+</div>
 
-## ✨ 核心特性
+RSS Reader 定时聚合多个 RSS、Atom 或 JSON Feed，在文章标题命中监听关键词后，通过 Telegram、飞书或钉钉发送通知。服务同时提供简洁的响应式阅读页面，实时展示内容、抓取状态和经过脱敏的运行配置。
 
-* **智能过滤**：为每个订阅源独立设置 `包含` 和 `排除` 关键词，实现精准的内容筛选。
-* **多源聚合**：通过一份 `config.json` 即可管理所有 RSS 订阅源，信息尽在掌握。
-* **多渠道推送**：无缝集成 **Telegram**, **飞书 (FeiShu)**, 和 **钉钉 (DingTalk)**，第一时间获取重要资讯。
-* **优雅的 Web UI**：
-    * 基于 Vue.js 和 Element Plus 构建，界面现代、美观。
-    * 通过 WebSocket 实现后端数据实时推送，内容更新无需刷新。
-    * 支持亮色/暗色模式自动切换，适应您的工作环境。
-    * 拥有卡片入场动画、悬停特效和长标题自动滚动等丰富的动态效果。
-* **自动化与高效率**：
-    * 后端定时任务自动刷新，无需人工干预。
-    * 增量更新机制，只处理新内容，性能卓越。
-    * 专业的格式化日志系统，分级、分类、高亮输出，便于监控和排错。
-* **配置热重载**：运行时可随时修改 `config.json`，应用会自动加载新配置，服务不中断。
-* **持久化归档**：记录已推送的文章，防止重复打扰。
+## 核心能力
 
----
+- 并发抓取多个订阅源，同一时刻只运行一轮刷新任务。
+- 全局关键词匹配，不区分大小写，自动忽略空值和重复项。
+- 支持 Telegram、飞书、钉钉，可同时启用多个通知渠道。
+- 仅在至少一个渠道投递成功后归档链接，避免误去重和重复通知。
+- Vue 3 + WebSocket 实时界面，无 Node.js、打包器或外部 CDN 依赖。
+- `config.json` 热重载；新配置无效时继续使用上一份有效配置。
+- 配置接口自动隐藏 Token、Webhook、Chat ID 和订阅 URL 路径。
+- 支持环境变量注入密钥、健康检查、优雅退出和非 root Docker 部署。
 
-## 🛠️ 技术栈
+## 快速开始
 
-* **后端**: Go, Gorilla WebSocket, Gocron
-* **前端**: Vue.js 3, Element Plus, Three.js
-* **数据处理**: Go-feed, Fsnotify
+需要 Go 1.25 或更高版本。
 
----
-
-## 🚀 快速开始
-### 方式一：本地直接运行
-
-#### 1. 环境准备
-
-* 确保您已安装 [Go](https://golang.org/dl/) (版本 >= 1.18)。
-* 一个现代浏览器 (Chrome, Firefox, Edge, Safari)。
-
-#### 2. 下载与配置
-
-1.  克隆本项目到您的本地：
-    ```bash
-    git clone [https://github.com/lcean/rss-reader.git](https://github.com/lcean/rss-reader.git)
-    cd rss-reader
-    ```
-
-2.  **核心配置**：复制或重命名 `config.json.example` 为 `config.json`，并根据您的需求修改其内容。这是一个配置示例：
-    ```json
-    {
-      "ReFresh": 30, // 全局刷新频率（分钟）
-      "Port": "8080", // Web 服务端口
-      "Values": [
-        {
-          "Url": "[https://rss.nodeseek.com](https://rss.nodeseek.com)", // 订阅源地址
-          "MustContain": ["VPS", "服务器"], // 必须包含的关键词
-          "MustNotContain": ["测评", "教程"] // 必须排除的关键词
-        }
-      ],
-      "Notify": {
-        "Telegram": {
-          "Token": "YOUR_TELEGRAM_BOT_TOKEN", // 你的 Telegram Bot Token
-          "ChatId": "YOUR_TELEGRAM_CHAT_ID" // 你的 Telegram Chat ID
-        }
-        // ... 其他通知渠道配置
-      }
-    }
-    ```
-    * 详细的 `config.json` 配置说明，请参考 [**功能详解文档**](https://github.com/LceAn/RSS-Reader/tree/main/README/function.md)。
-
-#### 3. 运行
-
-在项目根目录下，执行以下命令：
 ```bash
-go run main.go
-````
-
-当您在控制台看到类似以下的日志时，表示服务已成功启动：
-
-```
-2025-08-29 15:00:00 [INFO] [SYSTEM] - Server started on port: 8080
+git clone https://github.com/LceAn/RSS-Reader.git
+cd RSS-Reader
+cp config.example.json config.json
+go run .
 ```
 
-现在，打开您的浏览器并访问 `http://localhost:8080`，即可看到 RSS-Reader 的 Web 界面。
+PowerShell：
 
+```powershell
+git clone https://github.com/LceAn/RSS-Reader.git
+Set-Location RSS-Reader
+Copy-Item config.example.json config.json
+go run .
+```
 
-### 方式二：使用 Docker (敬请期待)
-🐳 Docker 部署的相关 Dockerfile 和说明文档正在准备中，未来将支持一行命令快速启动，敬请期待！
+启动后访问 [http://127.0.0.1:8080](http://127.0.0.1:8080)。先在 `config.json` 的 `values` 中加入订阅地址；修改订阅源、关键词、刷新周期或通知设置后，服务会自动重载。
 
------
+## 配置说明
 
-## 📂 项目文档
+完整模板见 [`config.example.json`](config.example.json)。
 
-  * [**功能详解 & 配置指南**](https://github.com/LceAn/RSS-Reader/tree/main/README/function.md)：深入了解 `config.json` 的所有配置项和高级用法。
-  * [**开发与更新日志**](https://github.com/LceAn/RSS-Reader/tree/main/README/update.md)：查看本项目从诞生至今的所有功能迭代和优化记录。
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `host` | string | HTTP 监听地址；留空时使用 `127.0.0.1` |
+| `port` | number | HTTP 监听端口，范围 `1-65535` |
+| `values` | string[] | RSS、Atom 或 JSON Feed 地址 |
+| `refresh` | number | 后端抓取周期，单位为分钟，必须大于 `0` |
+| `autoUpdatePush` | number | 页面内容检查周期，单位为分钟；`0` 表示关闭后续推送 |
+| `listHeight` | number | 阅读页中每个订阅列表的高度，单位为像素 |
+| `keywords` | string[] | 文章标题监听关键词，命中任意一个即进入通知流程 |
+| `notify` | object | Telegram、飞书和钉钉通知配置 |
+| `archives` | string | 已成功通知链接的本地归档路径 |
+| `webTitle` / `webDes` | string | 页面标题与描述 |
+| `github_*` | string | 页脚项目与作者链接 |
 
------
+`host` 和 `port` 的修改需要重启服务，其余常用字段支持热重载。保存的新配置必须通过完整校验，否则不会替换当前运行配置。
 
-## 📜 开源许可
+### 环境变量
 
-本项目采用 [MIT License](https://www.google.com/search?q=LICENSE) 开源许可。
+环境变量优先于 JSON 配置，建议用它们提供所有敏感值。
+
+| 环境变量 | 用途 |
+| --- | --- |
+| `RSS_READER_CONFIG` | 配置文件路径，默认 `config.json` |
+| `RSS_READER_HOST` | 覆盖 `host` |
+| `RSS_READER_PORT` | 覆盖 `port` |
+| `RSS_READER_ARCHIVES` | 覆盖归档文件路径 |
+| `RSS_READER_FEISHU_API` | 飞书 Webhook |
+| `RSS_READER_TELEGRAM_API` | Telegram API 模板 |
+| `RSS_READER_TELEGRAM_TOKEN` | Telegram Bot Token |
+| `RSS_READER_TELEGRAM_CHAT_ID` | Telegram Chat ID |
+| `RSS_READER_DINGTALK_WEBHOOK` | 钉钉 Webhook |
+| `RSS_READER_DINGTALK_SIGN` | 钉钉签名密钥 |
+
+PowerShell 示例：
+
+```powershell
+$env:RSS_READER_TELEGRAM_TOKEN = "YOUR_BOT_TOKEN"
+$env:RSS_READER_TELEGRAM_CHAT_ID = "YOUR_CHAT_ID"
+go run .
+```
+
+### Telegram 示例
+
+```json
+{
+  "api": "https://api.telegram.org/bot${token}/sendMessage",
+  "chat_id": "YOUR_CHAT_ID",
+  "token": "YOUR_BOT_TOKEN"
+}
+```
+
+发送时会把 `${token}` 替换为实际 Bot Token。
+
+## Docker 部署
+
+```bash
+cp config.example.json config.json
+docker compose up --build -d
+```
+
+Compose 只把服务映射到宿主机的 `127.0.0.1:8080`。容器使用非 root 用户运行，配置以只读方式挂载，归档数据保存在 `rss-reader-data` 命名卷中。
+
+```bash
+docker compose logs -f
+docker compose down
+```
+
+## HTTP 接口
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /` | RSS 阅读页面 |
+| `GET /feeds` | 当前内存中的 Feed 数据 |
+| `GET /ws` | WebSocket 状态与内容推送 |
+| `GET /api/config` | 脱敏配置，仅展示订阅域名和通知渠道状态 |
+| `GET /healthz` | 进程存活检查 |
+| `GET /readyz` | 首轮抓取完成后的就绪检查 |
+
+所有接口均为只读；配置修改只通过本地配置文件或环境变量完成。
+
+## 安全建议
+
+`config.json` 和 `archives.txt` 是本地运行数据，不应提交到 Git。仓库已忽略这两个文件，并提供不含真实凭据的 `config.example.json`。
+
+如果旧提交中曾包含 Token、Webhook、Chat ID 或带认证参数的订阅地址，仅添加 `.gitignore` 无法清除 Git 历史。请先轮换凭据，再根据需要清理历史记录。
+
+服务默认只监听回环地址。需要远程访问时，建议通过带 TLS 和身份验证的反向代理开放，不要直接监听公网网卡。
+
+## 开发与验证
+
+```bash
+go test ./...
+go vet ./...
+go test -race ./...
+go build ./...
+```
+
+`-race` 需要本机启用 CGO，并安装可用的 C 编译器。GitHub Actions 会执行单元测试、竞态检测、静态检查、漏洞检查和 Docker 构建。
+
+## 项目结构
+
+```text
+main.go                 HTTP、模板、WebSocket 与退出流程
+globals/                线程安全运行时状态和嵌入式静态资源
+models/                 配置与 Feed 数据模型
+utils/feed.go           抓取调度、热重载、匹配和通知流程
+utils/notify.go         通知渠道与 HTTP 投递
+globals/static/         Vue 3 阅读界面
+config.example.json     安全配置模板
+Dockerfile              非 root 容器镜像
+compose.yaml            本地容器编排
+.github/workflows/      自动化验证
+```
+
+更多说明：[`运行机制`](README/function.md) · [`更新记录`](README/update.md)
+
+本项目采用 [MIT License](LICENSE)。
 
 ---
-
-## 仓库结构
-
-- `.vscode/`
-- `LICENSE`
-- `README.md`
-- `README/`
-- `archives.txt`
-- `config.json`
-- `globals/`
-- `go.mod`
-- `go.sum`
-- `main.go`
-- `models/`
-- `utils/`
 
 <!-- repo-readme-standard:v1 -->
 ## 仓库维护信息

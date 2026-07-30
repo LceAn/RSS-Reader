@@ -1,0 +1,8 @@
+.git
+.github
+.vscode
+.smoke
+config.json
+archives.txt
+*.exe
+*.log

@@ -1,203 +1,270 @@
 package utils
 
 import (
+	"context"
 	"fmt"
-	"github.com/mmcdole/gofeed"
+	"path/filepath"
 	"rss-reader/globals"
 	"rss-reader/models"
 	"strings"
-	"time"
+	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/mmcdole/gofeed"
 )
 
-var feedLogger = NewLogger("FEED")
+const feedRequestTimeout = 20 * time.Second
+
+var (
+	feedLogger   = NewLogger("FEED")
+	refreshFeeds = make(chan struct{}, 1)
+)
 
 func escapeMarkdownV2(text string) string {
-    replacer := strings.NewReplacer(
-        "_", "\\_", "*", "\\*", "[", "\\[", "]", "\\]", "(",
-        "\\(", ")", "\\)", "~", "\\~", "`", "\\`", ">",
-        "\\>", "#", "\\#", "+", "\\+", "-", "\\-", "=",
-        "\\=", "|", "\\|", "{", "\\{", "}", "\\}", ".",
-        "\\.", "!", "\\!",
-    )
-    return replacer.Replace(text)
-}
-
-func UpdateFeeds() {
-	var (
-		tick = time.Tick(time.Duration(globals.RssUrls.ReFresh) * time.Minute)
+	replacer := strings.NewReplacer(
+		"_", "\\_", "*", "\\*", "[", "\\[", "]", "\\]", "(",
+		"\\(", ")", "\\)", "~", "\\~", "`", "\\`", ">",
+		"\\>", "#", "\\#", "+", "\\+", "-", "\\-", "=",
+		"\\=", "|", "\\|", "{", "\\{", "}", "\\}", ".",
+		"\\.", "!", "\\!",
 	)
-	for {
-		atomic.StoreInt32(&globals.FailedFeedCount, 0) // <-- 新增：重置失败计数器
-		formattedTime := time.Now().Format("2006-01-02 15:04:05")
-		for _, url := range globals.RssUrls.Values {
-			go UpdateFeed(url, formattedTime)
-		}
-		<-tick
+	return replacer.Replace(text)
+}
+
+func escapeMarkdownV2URL(rawURL string) string {
+	return strings.NewReplacer("\\", "\\\\", ")", "\\)").Replace(rawURL)
+}
+
+func TriggerFeedRefresh() {
+	select {
+	case refreshFeeds <- struct{}{}:
+	default:
 	}
 }
 
-func UpdateFeed(url, formattedTime string) {
-	feedLogger.Info("Start fetching feed url=%s", url)
-	result, err := globals.Fp.ParseURL(url)
+// UpdateFeeds runs one complete fetch cycle at a time. Waiting for all workers
+// prevents overlapping cycles and makes the status counters meaningful.
+func UpdateFeeds(ctx context.Context) {
+	for {
+		if ctx.Err() != nil {
+			globals.SetNextRefreshTime(time.Time{})
+			return
+		}
+		config := globals.GetConfig()
+		fetchAllFeeds(ctx, config)
+
+		refreshAfter := time.Duration(config.ReFresh) * time.Minute
+		globals.SetNextRefreshTime(time.Now().Add(refreshAfter))
+		timer := time.NewTimer(refreshAfter)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			globals.SetNextRefreshTime(time.Time{})
+			return
+		case <-timer.C:
+		case <-refreshFeeds:
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+		}
+	}
+}
+
+func fetchAllFeeds(ctx context.Context, config models.Config) {
+	globals.BeginFetchCycle()
+	formattedTime := time.Now().Format("2006-01-02 15:04:05")
+	var successful int32
+	var failed int32
+
+	var waitGroup sync.WaitGroup
+	for _, feedURL := range config.Values {
+		feedURL := feedURL
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			if err := updateFeed(ctx, config, feedURL, formattedTime); err != nil {
+				feedLogger.Warn("Failed to fetch feed host=%s, error=%v", endpointForLog(feedURL), networkError(err))
+				atomic.AddInt32(&failed, 1)
+				return
+			}
+			atomic.AddInt32(&successful, 1)
+		}()
+	}
+	waitGroup.Wait()
+	globals.FinishFetchCycle(int(successful), int(failed))
+}
+
+func updateFeed(ctx context.Context, config models.Config, feedURL, formattedTime string) error {
+	feedLogger.Info("Start fetching feed host=%s", endpointForLog(feedURL))
+	requestContext, cancel := context.WithTimeout(ctx, feedRequestTimeout)
+	defer cancel()
+
+	result, err := gofeed.NewParser().ParseURLWithContext(feedURL, requestContext)
 	if err != nil {
-		feedLogger.Warn("Failed to fetch feed url=%s, error=%v", url, err)
-		atomic.AddInt32(&globals.FailedFeedCount, 1) // <-- 新增：失败计数+1
-		return
+		return err
 	}
-	//feed内容无更新时无需更新缓存
-	if cache, ok := globals.DbMap[url]; ok &&
-		len(result.Items) > 0 &&
-		len(cache.Items) > 0 &&
-		result.Items[0].Link == cache.Items[0].Link {
-		return
+
+	cache, cacheExists := globals.GetFeed(feedURL)
+	if cacheExists && len(result.Items) > 0 && len(cache.Items) > 0 && result.Items[0].Link == cache.Items[0].Link {
+		return nil
 	}
+
 	customFeed := models.Feed{
 		Title:  result.Title,
 		Link:   result.Link,
 		Custom: map[string]string{"lastupdate": formattedTime},
 		Items:  make([]models.Item, 0, len(result.Items)),
 	}
-	for _, v := range result.Items {
+	for _, item := range result.Items {
 		customFeed.Items = append(customFeed.Items, models.Item{
-			Link:        v.Link,
-			Title:       v.Title,
-			Description: v.Description,
+			Link:        item.Link,
+			Title:       item.Title,
+			Description: item.Description,
 		})
-		Check(url, result, v)
+		checkAndNotify(ctx, config, result, item)
 	}
-	globals.Lock.Lock()
-	defer globals.Lock.Unlock()
-	globals.DbMap[url] = customFeed
+	globals.SetFeed(feedURL, customFeed)
+	return nil
 }
 
-// GetFeeds 获取feeds列表
 func GetFeeds() []models.Feed {
-	feeds := make([]models.Feed, 0, len(globals.RssUrls.Values))
-	for _, url := range globals.RssUrls.Values {
-		globals.Lock.RLock()
-		cache, ok := globals.DbMap[url]
-		globals.Lock.RUnlock()
-		if !ok {
-			feedLogger.Warn("Error getting feed from db is null %v", url)
-			continue
-		}
-
-		feeds = append(feeds, cache)
-	}
-	return feeds
+	config := globals.GetConfig()
+	return globals.GetFeeds(config.Values)
 }
 
-func WatchConfigFileChanges(filePath string) {
-	// 创建一个新的监控器
+// WatchConfigFileChanges watches the containing directory so editors that
+// replace config.json via rename still trigger a reload.
+func WatchConfigFileChanges(ctx context.Context, filePath string) {
+	absolutePath, err := filepath.Abs(filePath)
+	if err != nil {
+		NewLogger("SYSTEM").Error("Cannot resolve config path: %v", err)
+		return
+	}
+
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		NewLogger("SYSTEM").Error("File watcher setup failed: %v", err)
+		return
 	}
 	defer watcher.Close()
 
-	// 添加要监控的文件
-	err = watcher.Add(filePath)
-	if err != nil {
+	if err := watcher.Add(filepath.Dir(absolutePath)); err != nil {
 		NewLogger("SYSTEM").Error("File watcher error: %v", err)
+		return
 	}
 
-	// 启动一个 goroutine 来处理文件变化事件
-	go func() {
-		for {
-			time.Sleep(7 * time.Second)
-			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					System("通道关闭1")
-					return
-				}
-				if event.Op&fsnotify.Write == fsnotify.Write {
-					System("文件已修改")
-					globals.Init()
-					formattedTime := time.Now().Format("2006-01-02 15:04:05")
-					for _, url := range globals.RssUrls.Values {
-						go UpdateFeed(url, formattedTime)
-					}
-				}
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					System("通道关闭2")
-					return
-				}
-				System("错误:", err)
-				return
-			}
+	reload := make(chan struct{}, 1)
+	var debounceTimer *time.Timer
+	defer func() {
+		if debounceTimer != nil {
+			debounceTimer.Stop()
 		}
 	}()
 
-	select {}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			eventPath, pathErr := filepath.Abs(event.Name)
+			if pathErr != nil || !strings.EqualFold(eventPath, absolutePath) {
+				continue
+			}
+			if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) == 0 {
+				continue
+			}
+			if debounceTimer != nil {
+				debounceTimer.Stop()
+			}
+			debounceTimer = time.AfterFunc(300*time.Millisecond, func() {
+				select {
+				case reload <- struct{}{}:
+				default:
+				}
+			})
+
+		case <-reload:
+			if err := globals.ReloadConfig(); err != nil {
+				NewLogger("SYSTEM").Error("Config reload rejected: %v", err)
+				continue
+			}
+			System("配置已重新加载")
+			TriggerFeedRefresh()
+
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			NewLogger("SYSTEM").Error("File watcher error: %v", err)
+		}
+	}
 }
 
-func Check(url string, result *gofeed.Feed, v *gofeed.Item) {
-	cache, cacheOk := globals.DbMap[url]
-	if !cacheOk || cache.Items[0].Link != result.Items[0].Link {
+func checkAndNotify(ctx context.Context, config models.Config, result *gofeed.Feed, item *gofeed.Item) {
+	if !Matches(item.Title, config.Keywords) {
+		return
+	}
 
-		link := v.Link
-		link = strings.TrimSpace(link)
-		linkStrSplitForParam := strings.Split(link, "?")
-		if linkStrSplitForParam != nil && len(linkStrSplitForParam) != 0 {
-			link = linkStrSplitForParam[0]
-		}
-		linkStrSplitForRoute := strings.Split(link, "#")
-		if linkStrSplitForRoute != nil && len(linkStrSplitForRoute) != 0 {
-			link = linkStrSplitForRoute[0]
-		}
+	link := canonicalLink(item.Link)
+	if link == "" || !globals.ReserveLink(link) {
+		return
+	}
 
-		_, fileCacheOk := globals.Hash[link]
-		if fileCacheOk {
+	title := escapeMarkdownV2(item.Title)
+	source := escapeMarkdownV2(result.Title)
+	publishTime := item.PublishedParsed
+	if publishTime == nil {
+		now := time.Now()
+		publishTime = &now
+	}
+	timeString := escapeMarkdownV2(publishTime.Format("2006-01-02 15:04"))
+	content := fmt.Sprintf(
+		"*%s*\n\n*来源*：%s\n*时间*：%s\n[点击阅读原文](%s)",
+		title,
+		source,
+		timeString,
+		escapeMarkdownV2URL(item.Link),
+	)
+
+	dispatchNotification(ctx, func(ctx context.Context) {
+		result := Notify(ctx, Message{
+			Routes:   []string{FeiShuRoute, TelegramRoute, DingtalkRoute},
+			Content:  content,
+			FeedItem: *item,
+		})
+		if result.Sent == 0 {
+			globals.ReleaseLink(link)
+			if result.Err != nil {
+				notifyLogger.Error("Notification failed for host=%s: %v", endpointForLog(link), result.Err)
+			}
 			return
 		}
-		// 匹配关键词
-		MatchStr(v.Title, func(msg string) {
-			_, fileCacheOk = globals.Hash[link]
-			if fileCacheOk {
-				return
-			} else {
-				globals.Hash[link] = 1
-		
-				// --- 修改开始 ---
-		
-				// 1. 为 Markdown V2 准备需要转义的文本
-				title := escapeMarkdownV2(v.Title)
-				source := escapeMarkdownV2(result.Title)
-				link := v.Link // 链接URL本身不需要转义
+		if result.Err != nil {
+			notifyLogger.Warn("Notification partially failed for host=%s: %v", endpointForLog(link), result.Err)
+		}
+		if err := globals.CommitLink(config.Archives, link); err != nil {
+			notifyLogger.Error("Cannot persist delivered link for host=%s: %v", endpointForLog(link), err)
+		}
+	})
+}
 
-				// 2. 【新增】获取并格式化文章的发布时间
-				publishTime := v.PublishedParsed
-				if publishTime == nil { // 如果文章没有提供发布时间，则使用当前时间
-					now := time.Now()
-					publishTime = &now
-				}
-				timeString := escapeMarkdownV2(publishTime.Format("2006-01-02 15:04"))
-
-				// 3. 构建包含【时间】的完整 Markdown 消息
-				content := fmt.Sprintf(
-					"*%s*\n\n*来源*：%s\n*时间*：%s\n[点击阅读原文](%s)",
-					title,
-					source,
-					timeString, // 将格式化后的时间添加到消息中
-					link,
-				)
-
-				// 4. 发送通知
-				go Notify(Message{
-					Routes:   []string{FeiShuRoute, TelegramRoute, DingtalkRoute},
-					Content:  content,
-					FeedItem: *v,
-				})
-		
-				// --- 修改结束 ---
-		
-				globals.WriteFile(globals.RssUrls.Archives, link)
-			}
-		})
+func canonicalLink(link string) string {
+	link = strings.TrimSpace(link)
+	if fragment := strings.IndexByte(link, '#'); fragment >= 0 {
+		link = link[:fragment]
 	}
+	return link
 }

@@ -1,0 +1,15 @@
+services:
+  rss-reader:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      RSS_READER_HOST: 0.0.0.0
+      RSS_READER_ARCHIVES: /app/data/archives.txt
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - rss-reader-data:/app/data
+
+volumes:
+  rss-reader-data:

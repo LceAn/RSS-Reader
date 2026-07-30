@@ -1,294 +1,296 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><< .WebTitle >></title>
-    <meta name="description" content='<< .WebDes >>'>
+    <meta name="description" content="<< .WebDes >>">
     <meta name="keywords" content="<< .Keywords >>">
     <meta name="author" content="srcrs">
-    <link rel="stylesheet" href="static/index.min.css">
     <link rel="stylesheet" href="static/background.cartoon.css">
     <link rel="stylesheet" href="static/index.2.css">
-    <link rel="icon" href="static/favicon.svg" type="image/x-icon">
+    <link rel="icon" href="static/favicon.svg" type="image/svg+xml">
 </head>
 <body>
-<div id="app">
-    <el-container>
-        <el-header>
-            <h1>
-                << .WebTitle >>
-            </h1>
-            <div class="status-container" @mouseenter="showStatusPopup = true" @mouseleave="showStatusPopup = false">
-                <div class="status-indicator" :class="indicatorClass"></div>
-                <transition name="popup">
-                    <div class="status-popup" v-if="showStatusPopup">
-                        <h4>系统状态</h4>
-                        <ul>
-                            <li><span>订阅源</span> <strong>{{ systemStatus.totalFeeds }}</strong></li>
-                            <li><span>成功</span> <strong>{{ systemStatus.successful }}</strong></li>
-                            <li><span>失败</span> <strong :class="{ 'has-error': systemStatus.failed > 0 }">{{ systemStatus.failed }}</strong></li>
-                        </ul>
-                        <div class="countdown">
-                            下次刷新: <strong>{{ formattedCountdown }}</strong>
-                        </div>
-                    </div>
-                </transition>
+<div id="app" v-cloak>
+    <div class="app-shell">
+        <header class="site-header">
+            <div class="brand-block">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" role="img">
+                        <path d="M5 4.75a14.25 14.25 0 0 1 14.25 14.25M5 10.5A8.5 8.5 0 0 1 13.5 19M6.25 19a1.25 1.25 0 1 1-2.5 0 1.25 1.25 0 0 1 2.5 0Z"/>
+                    </svg>
+                </span>
+                <div>
+                    <h1><< .WebTitle >></h1>
+                </div>
             </div>
 
-            <button id="settings-btn" @click="toggleSettings"> ⚙ </button>
-            <transition name="popup">
-                <div v-if="showSettings" class="settings-panel">
-                    <div class="settings-header">
-                        <h2>配置中心</h2>
-                        <button class="close-btn" @click="toggleSettings">×</button>
-                    </div>
-
-                    <div class="settings-section">
-                        <h4>通用设置</h4>
-                        <ul>
-                            <li><span>服务端口</span><strong>{{ config.Port }}</strong></li>
-                            <li><span>刷新频率</span><strong>{{ config.ReFresh }} 分钟</strong></li>
-                            <li><span>前端推送</span><strong :class="config.AutoUpdatePush > 0 ? 'is-enabled' : ''">{{ config.AutoUpdatePush > 0 ? '启用' : '禁用' }}</strong></li>
-                            <li><span>卡片高度</span><strong>{{ config.ListHeight }} px</strong></li>
-                        </ul>
-                    </div>
-
-                    <div class="settings-section">
-                        <h4>订阅源</h4>
-                        <ul class="feed-list" v-if="config.Values && config.Values.length > 0">
-                            <li v-for="feed in config.Values">
-                                <p class="feed-url">{{ feed.Url }}</p>
-                                <div class="keywords">
-                                    <span v-if="feed.MustContain && feed.MustContain.length > 0" class="tag-group">
-                                        <strong>包含:</strong>
-                                        <span v-for="keyword in feed.MustContain" class="tag include">{{ keyword }}</span>
-                                    </span>
-                                    <span v-if="feed.MustNotContain && feed.MustNotContain.length > 0" class="tag-group">
-                                        <strong>排除:</strong>
-                                        <span v-for="keyword in feed.MustNotContain" class="tag exclude">{{ keyword }}</span>
-                                    </span>
+            <div class="header-actions">
+                <div class="status-container" @mouseenter="showStatusPopup = true" @mouseleave="showStatusPopup = false">
+                    <button class="icon-button status-button" type="button" aria-label="查看系统状态"
+                            :aria-expanded="showStatusPopup" @click="showStatusPopup = !showStatusPopup"
+                            @focus="showStatusPopup = true" @blur="showStatusPopup = false">
+                        <span class="status-indicator" :class="indicatorClass"></span>
+                        <span class="button-label">运行状态</span>
+                    </button>
+                    <transition name="popover">
+                        <section class="status-popup" v-if="showStatusPopup" aria-label="系统状态">
+                            <div class="popup-title-row">
+                                <div>
+                                    <h2>系统状态</h2>
                                 </div>
-                            </li>
-                        </ul>
-                        <p v-else>暂无订阅源配置。</p>
-                    </div>
-
-                    <div class="settings-section">
-                        <h4>通知渠道</h4>
-                        <ul>
-                            <li>
-                                <span>Telegram</span>
-                                <strong v-if="config.Notify && config.Notify.Telegram && config.Notify.Telegram.Token" class="is-enabled">
-                                    已配置
-                                </strong>
-                                <strong v-else>未配置</strong>
-                            </li>
-                        </ul>
-                    </div>
+                                <span class="status-copy" :class="indicatorClass">{{ statusLabel }}</span>
+                            </div>
+                            <dl class="status-grid">
+                                <div><dt>订阅源</dt><dd>{{ systemStatus.totalFeeds }}</dd></div>
+                                <div><dt>成功</dt><dd>{{ systemStatus.successful }}</dd></div>
+                                <div><dt>失败</dt><dd :class="{ 'has-error': systemStatus.failed > 0 }">{{ systemStatus.failed }}</dd></div>
+                                <div><dt>任务</dt><dd>{{ systemStatus.refreshing ? '刷新中' : '空闲' }}</dd></div>
+                            </dl>
+                            <div class="countdown-row">
+                                <span>下次刷新</span>
+                                <strong>{{ formattedCountdown }}</strong>
+                            </div>
+                        </section>
+                    </transition>
                 </div>
-            </transition>
 
-        </el-header>
-        
-        <el-main v-loading.fullscreen.lock="fullscreenLoading" element-loading-text="拼命加载中">
-            <el-row :gutter="20">
+                <button id="settings-btn" class="icon-button" type="button" aria-label="打开设置"
+                        :aria-expanded="showSettings" @click="toggleSettings">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 15.25A3.25 3.25 0 1 0 12 8.75a3.25 3.25 0 0 0 0 6.5Z"/>
+                        <path d="M19.43 13.25a7.8 7.8 0 0 0 .05-2.5l2-1.55-2-3.46-2.47 1a8.1 8.1 0 0 0-2.16-1.25L14.5 2.8h-5l-.35 2.69a8.1 8.1 0 0 0-2.16 1.25l-2.47-1-2 3.46 2 1.55a7.8 7.8 0 0 0 .05 2.5l-2.05 1.58 2 3.46 2.54-1.03a8.2 8.2 0 0 0 2.09 1.2l.35 2.74h5l.35-2.74a8.2 8.2 0 0 0 2.09-1.2l2.54 1.03 2-3.46-2.05-1.58Z"/>
+                    </svg>
+                    <span class="button-label">设置</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="feed-main">
+            <div class="section-heading">
+                <h2>最新内容</h2>
+            </div>
+
+            <section class="feed-grid" aria-label="RSS 订阅列表">
                 << $root := . >>
                 << range $index, $feed := .RssDataList >>
-                <el-col v-if="showSEOFlag" :xs="24" :sm="12" :md="8" :lg="6" :key="$index" class="feed-col">
-                    <el-card class="box-card">
-                        <div slot="header" class="card-header">
-                            <span><< $feed.Title >></span>
-                            <time class="time"><< $feed.Custom.lastupdate >></time>
+                <article v-if="showSEOFlag" class="feed-card">
+                    <header class="card-header">
+                        <div class="feed-title-row">
+                            <h3><< $feed.Title >></h3>
+                            <span class="card-count"><< len $feed.Items >></span>
                         </div>
-                        <el-scrollbar :style="{ height: '<< $root.ListHeight >>px' }">
-                            <el-list>
-                                << range $i, $item :=$feed.Items >>
-                                <el-list-item>
-                                    <div class="list-item-title">
-                                        <el-link href="<< $item.Link >>" target="_blank" :title="$item.Title">
-                                            << $item.Title >>
-                                        </el-link>
-                                    </div>
-                                </el-list-item>
-                                << end >>
-                            </el-list>
-                        </el-scrollbar>
-                    </el-card>
-                </el-col>
-                << end>>
-                <el-col :xs="24" :sm="12" :md="8" :lg="6" v-for="(feed, index) in feeds" :key="index"
-                        class="feed-col">
-                    <el-card class="box-card">
-                        <div slot="header" class="card-header">
-                            <span>{{ feed.title }}</span>
-                            <time class="time">{{ feed.custom.lastupdate }}</time>
-                        </div>
-                        <el-scrollbar :style="{ height: '<< .ListHeight >>px' }">
-                            <el-list v-for="(item, i) in feed.items" :key="i">
-                                <el-list-item>
-                                    <div class="list-item-title">
-                                        <el-link :href="item.link" target="_blank" :title="item.title">{{ item.title }}</el-link>
-                                    </div>
-                                </el-list-item>
-                            </el-list>
-                        </el-scrollbar>
-                    </el-card>
-                </el-col>
-            </el-row>
-        </el-main>
+                        <time><< $feed.Custom.lastupdate >></time>
+                    </header>
+                    <div class="feed-scroll" style="--list-height: << $root.ListHeight >>px;">
+                        <ul class="feed-items">
+                            << range $item := $feed.Items >>
+                            <li>
+                                <a href="<< $item.Link >>" target="_blank" rel="noopener noreferrer" title="<< $item.Title >>">
+                                    <span><< $item.Title >></span>
+                                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 5h8v8M15 5 5 15"/></svg>
+                                </a>
+                            </li>
+                            << end >>
+                        </ul>
+                        << if eq (len $feed.Items) 0 >><p class="feed-empty">暂无更新</p><< end >>
+                    </div>
+                </article>
+                << end >>
 
-        <el-footer>
-            <el-link href="<< .Github_project_url >>" target="_blank"><< .Github_project_url_name>></el-link>
-            <el-link href="<< .Github_author_url >>" target="_blank"><< .Github_author_url_name>></el-link>
-        </el-footer>
-    </el-container>
+                <article class="feed-card" v-for="(feed, index) in feeds" :key="feed.link || feed.title || index">
+                    <header class="card-header">
+                        <div class="feed-title-row">
+                            <h3>{{ feed.title }}</h3>
+                            <span class="card-count">{{ feed.items ? feed.items.length : 0 }}</span>
+                        </div>
+                        <time>{{ feed.custom && feed.custom.lastupdate ? feed.custom.lastupdate : '刚刚更新' }}</time>
+                    </header>
+                    <div class="feed-scroll" :style="{ '--list-height': `${listHeight}px` }">
+                        <ul class="feed-items">
+                            <li v-for="(item, itemIndex) in feed.items" :key="item.link || `${index}-${itemIndex}`">
+                                <a :href="item.link" target="_blank" rel="noopener noreferrer" :title="item.title">
+                                    <span>{{ item.title }}</span>
+                                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 5h8v8M15 5 5 15"/></svg>
+                                </a>
+                            </li>
+                        </ul>
+                        <p class="feed-empty" v-if="!feed.items || !feed.items.length">暂无更新</p>
+                    </div>
+                </article>
+            </section>
+        </main>
+
+        <footer class="site-footer">
+            <div>
+                <span>RSS Reader</span>
+            </div>
+            <nav aria-label="项目链接">
+                <a href="<< .Github_project_url >>" target="_blank" rel="noopener noreferrer"><< .Github_project_url_name >></a>
+                <a href="<< .Github_author_url >>" target="_blank" rel="noopener noreferrer"><< .Github_author_url_name >></a>
+            </nav>
+        </footer>
+    </div>
+
+    <transition name="backdrop">
+        <button v-if="showSettings" class="settings-backdrop" type="button" aria-label="关闭设置" @click="toggleSettings"></button>
+    </transition>
+    <transition name="drawer">
+        <aside v-if="showSettings" class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+            <header class="settings-header">
+                <h2 id="settings-title">设置</h2>
+                <button class="close-btn" type="button" aria-label="关闭设置" @click="toggleSettings">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+                </button>
+            </header>
+
+            <div class="settings-content" v-if="!configLoading && !configError">
+                <section class="settings-section">
+                    <div class="settings-section-title">
+                        <h3>运行</h3>
+                    </div>
+                    <dl class="settings-list">
+                        <div><dt>监听地址</dt><dd>{{ config.host }}:{{ config.port }}</dd></div>
+                        <div><dt>刷新频率</dt><dd>{{ config.refresh }} 分钟</dd></div>
+                        <div><dt>前端推送</dt><dd>{{ config.autoUpdatePush > 0 ? `${config.autoUpdatePush} 分钟` : '已关闭' }}</dd></div>
+                        <div><dt>列表高度</dt><dd>{{ config.listHeight }} px</dd></div>
+                    </dl>
+                </section>
+
+                <section class="settings-section">
+                    <div class="settings-section-title">
+                        <h3>监听关键词</h3>
+                    </div>
+                    <div class="tag-list" v-if="config.keywords && config.keywords.length">
+                        <span class="keyword-tag" v-for="keyword in config.keywords" :key="keyword">{{ keyword }}</span>
+                    </div>
+                    <p class="empty-state" v-else>当前未配置监听关键词</p>
+                </section>
+
+                <section class="settings-section">
+                    <div class="settings-section-title">
+                        <h3>订阅源 <span>{{ config.feeds ? config.feeds.length : 0 }}</span></h3>
+                    </div>
+                    <ul class="source-list" v-if="config.feeds && config.feeds.length">
+                        <li v-for="feed in config.feeds" :key="feed">
+                            <span class="source-icon" aria-hidden="true"></span>
+                            <span>{{ feed }}</span>
+                        </li>
+                    </ul>
+                    <p class="empty-state" v-else>当前未配置订阅源</p>
+                </section>
+
+                <section class="settings-section">
+                    <div class="settings-section-title">
+                        <h3>通知</h3>
+                    </div>
+                    <ul class="notify-list">
+                        <li><span>Telegram</span><strong :class="{ enabled: config.notify && config.notify.telegram }">{{ channelStatus(config.notify && config.notify.telegram) }}</strong></li>
+                        <li><span>飞书</span><strong :class="{ enabled: config.notify && config.notify.feishu }">{{ channelStatus(config.notify && config.notify.feishu) }}</strong></li>
+                        <li><span>钉钉</span><strong :class="{ enabled: config.notify && config.notify.dingtalk }">{{ channelStatus(config.notify && config.notify.dingtalk) }}</strong></li>
+                    </ul>
+                </section>
+            </div>
+
+            <div class="panel-state" v-else-if="configLoading">
+                <span class="loading-spinner"></span>
+                <p>正在读取配置…</p>
+            </div>
+            <div class="panel-state panel-error" v-else>
+                <p>{{ configError }}</p>
+                <button type="button" @click="getConfig">重新加载</button>
+            </div>
+        </aside>
+    </transition>
 </div>
-<div>
-    <canvas class="canvas-webgl"></canvas>
-</div>
-<script src="static/three.min.js"></script>
+
 <script src="static/vue.global.prod.js"></script>
-<script src="static/index.full.min.js"></script>
-<script type="text/javascript">
-    (function (window) {
-        var Plane = function () {
-            this.uniforms = {
-                time: {
-                    type: 'f',
-                    value: 0
-                }
-            }
-            this.mesh = this.createMesh()
-            this.time = 1
-        }
-        Plane.prototype.createMesh = function () {
-            return new THREE.Mesh(
-                new THREE.PlaneGeometry(256, 256, 256, 256),
-                new THREE.RawShaderMaterial({
-                    uniforms: this.uniforms,
-                    vertexShader:
-                        '#define GLSLIFY 1\nattribute vec3 position;\n\nuniform mat4 projectionMatrix;\nuniform mat4 modelViewMatrix;\nuniform float time;\n\nvarying vec3 vPosition;\n\nmat4 rotateMatrixX(float radian) {\n  return mat4(\n    1.0, 0.0, 0.0, 0.0,\n    0.0, cos(radian), -sin(radian), 0.0,\n    0.0, sin(radian), cos(radian), 0.0,\n    0.0, 0.0, 0.0, 1.0\n  );\n}\n\n//\n// GLSL textureless classic 3D noise "cnoise",\n// with an RSL-style periodic variant "pnoise".\n// Author:  Stefan Gustavson (stefan.gustavson@liu.se)\n// Version: 2011-10-11\n//\n// Many thanks to Ian McEwan of Ashima Arts for the\n// ideas for permutation and gradient selection.\n//\n// Copyright (c) 2011 Stefan Gustavson. All rights reserved.\n// Distributed under the MIT license. See LICENSE file.\n// https://github.com/ashima/webgl-noise\n//\n\nvec3 mod289(vec3 x)\n{\n  return x - floor(x * (1.0 / 289.0)) * 289.0;\n}\n\nvec4 mod289(vec4 x)\n{\n  return x - floor(x * (1.0 / 289.0)) * 289.0;\n}\n\nvec4 permute(vec4 x)\n{\n  return mod289(((x*34.0)+1.0)*x);\n}\n\nvec4 taylorInvSqrt(vec4 r)\n{\n  return 1.79284291400159 - 0.85373472095314 * r;\n}\n\nvec3 fade(vec3 t) {\n  return t*t*t*(t*(t*6.0-15.0)+10.0);\n}\n\n// Classic Perlin noise\nfloat cnoise(vec3 P)\n{\n  vec3 Pi0 = floor(P); // Integer part for indexing\n  vec3 Pi1 = Pi0 + vec3(1.0); // Integer part + 1\n  Pi0 = mod289(Pi0);\n  Pi1 = mod289(Pi1);\n  vec3 Pf0 = fract(P); // Fractional part for interpolation\n  vec3 Pf1 = Pf0 - vec3(1.0); // Fractional part - 1.0\n  vec4 ix = vec4(Pi0.x, Pi1.x, Pi0.x, Pi1.x);\n  vec4 iy = vec4(Pi0.yy, Pi1.yy);\n  vec4 iz0 = Pi0.zzzz;\n  vec4 iz1 = Pi1.zzzz;\n\n  vec4 ixy = permute(permute(ix) + iy);\n  vec4 ixy0 = permute(ixy + iz0);\n  vec4 ixy1 = permute(ixy + iz1);\n\n  vec4 gx0 = ixy0 * (1.0 / 7.0);\n  vec4 gy0 = fract(floor(gx0) * (1.0 / 7.0)) - 0.5;\n  gx0 = fract(gx0);\n  vec4 gz0 = vec4(0.5) - abs(gx0) - abs(gy0);\n  vec4 sz0 = step(gz0, vec4(0.0));\n  gx0 -= sz0 * (step(0.0, gx0) - 0.5);\n  gy0 -= sz0 * (step(0.0, gy0) - 0.5);\n\n  vec4 gx1 = ixy1 * (1.0 / 7.0);\n  vec4 gy1 = fract(floor(gx1) * (1.0 / 7.0)) - 0.5;\n  gx1 = fract(gx1);\n  vec4 gz1 = vec4(0.5) - abs(gx1) - abs(gy1);\n  vec4 sz1 = step(gz1, vec4(0.0));\n  gx1 -= sz1 * (step(0.0, gx1) - 0.5);\n  gy1 -= sz1 * (step(0.0, gy1) - 0.5);\n\n  vec3 g000 = vec3(gx0.x,gy0.x,gz0.x);\n  vec3 g100 = vec3(gx0.y,gy0.y,gz0.y);\n  vec3 g010 = vec3(gx0.z,gy0.z,gz0.z);\n  vec3 g110 = vec3(gx0.w,gy0.w,gz0.w);\n  vec3 g001 = vec3(gx1.x,gy1.x,gz1.x);\n  vec3 g101 = vec3(gx1.y,gy1.y,gz1.y);\n  vec3 g011 = vec3(gx1.z,gy1.z,gz1.z);\n  vec3 g111 = vec3(gx1.w,gy1.w,gz1.w);\n\n  vec4 norm0 = taylorInvSqrt(vec4(dot(g000, g000), dot(g010, g010), dot(g100, g100), dot(g110, g110)));\n  g000 *= norm0.x;\n  g010 *= norm0.y;\n  g100 *= norm0.z;\n  g110 *= norm0.w;\n  vec4 norm1 = taylorInvSqrt(vec4(dot(g001, g001), dot(g011, g011), dot(g101, g101), dot(g111, g111)));\n  g001 *= norm1.x;\n  g011 *= norm1.y;\n  g101 *= norm1.z;\n  g111 *= norm1.w;\n\n  float n000 = dot(g000, Pf0);\n  float n100 = dot(g100, vec3(Pf1.x, Pf0.yz));\n  float n010 = dot(g010, vec3(Pf0.x, Pf1.y, Pf0.z));\n  float n110 = dot(g110, vec3(Pf1.xy, Pf0.z));\n  float n001 = dot(g001, vec3(Pf0.xy, Pf1.z));\n  float n101 = dot(g101, vec3(Pf1.x, Pf0.y, Pf1.z));\n  float n011 = dot(g011, vec3(Pf0.x, Pf1.yz));\n  float n111 = dot(g111, Pf1);\n\n  vec3 fade_xyz = fade(Pf0);\n  vec4 n_z = mix(vec4(n000, n100, n010, n110), vec4(n001, n101, n011, n111), fade_xyz.z);\n  vec2 n_yz = mix(n_z.xy, n_z.zw, fade_xyz.y);\n  float n_xyz = mix(n_yz.x, n_yz.y, fade_xyz.x);\n  return 2.2 * n_xyz;\n}\n\nvoid main(void) {\n  vec3 updatePosition = (rotateMatrixX(radians(90.0)) * vec4(position, 1.0)).xyz;\n  float sin1 = sin(radians(updatePosition.x / 128.0 * 90.0));\n  vec3 noisePosition = updatePosition + vec3(0.0, 0.0, time * -30.0);\n  float noise1 = cnoise(noisePosition * 0.08);\n  float noise2 = cnoise(noisePosition * 0.06);\n  float noise3 = cnoise(noisePosition * 0.4);\n  vec3 lastPosition = updatePosition + vec3(0.0,\n    noise1 * sin1 * 8.0\n    + noise2 * sin1 * 8.0\n    + noise3 * (abs(sin1) * 2.0 + 0.5)\n    + pow(sin1, 2.0) * 40.0, 0.0);\n\n  vPosition = lastPosition;\n  gl_Position = projectionMatrix * modelViewMatrix * vec4(lastPosition, 1.0);\n}\n',
-                    fragmentShader:
-                        'precision highp float;\n#define GLSLIFY 1\n\nvarying vec3 vPosition;\n\nvoid main(void) {\n  float opacity = (96.0 - length(vPosition)) / 256.0 * 0.6;\n  vec3 color = vec3(0.6);\n  gl_FragColor = vec4(color, opacity);\n}\n',
-                    transparent: true,
-                })
-            )
-        }
-        Plane.prototype.render = function (time) {
-            this.uniforms.time.value += time * this.time
-        }
-
-        window.Plane = Plane
-    })(window)
-
-    window.onload = function () {
-        var canvas = document.querySelector('.canvas-webgl')
-        var renderer = new THREE.WebGLRenderer({
-            antialias: false,
-            canvas: canvas,
-        })
-        var scene = new THREE.Scene()
-        var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000)
-        var clock = new THREE.Clock()
-
-        var plane = new Plane()
-
-        function resizeWindow() {
-            var w = window.innerWidth;
-            var h = window.innerHeight;
-            canvas.width = w
-            canvas.height = h
-            camera.aspect = w / h
-            camera.updateProjectionMatrix()
-            renderer.setSize(w, h)
-        }
-
-        function render() {
-            plane.render(clock.getDelta())
-            renderer.render(scene, camera)
-        }
-
-        function renderLoop() {
-            render()
-            requestAnimationFrame(renderLoop)
-        }
-
-        function init() {
-            renderer.setSize(window.innerWidth, window.innerHeight)
-            renderer.setClearColor(0xffffff, 1.0)
-            camera.position.set(0, 16, 128)
-            camera.lookAt(new THREE.Vector3(0, 28, 0))
-
-            scene.add(plane.mesh)
-
-            window.addEventListener('resize', resizeWindow)
-            resizeWindow()
-            renderLoop()
-        }
-
-        init()
-    };
-</script>
 <script>
     const app = Vue.createApp({
         data() {
             return {
                 feeds: [],
                 showSEOFlag: true,
-                fullscreenLoading: true,
                 systemStatus: {
                     totalFeeds: 0,
                     successful: 0,
                     failed: 0,
+                    refreshing: false,
                     nextRefreshIn: 0,
                 },
                 showStatusPopup: false,
-                isPc: true,
-                autoUpdatePush: << .AutoUpdatePush >> ,
-                listHeight: << .ListHeight >> ,
+                autoUpdatePush: << .AutoUpdatePush >>,
+                listHeight: << .ListHeight >>,
                 showSettings: false,
-                config: {},
+                configLoading: false,
+                configError: '',
+                config: {
+                    host: '—',
+                    port: '—',
+                    refresh: '—',
+                    autoUpdatePush: 0,
+                    listHeight: << .ListHeight >>,
+                    keywords: [],
+                    feeds: [],
+                    notify: {},
+                },
+                reconnectTimer: null,
             };
         },
         computed: {
             indicatorClass() {
-                if (this.systemStatus.failed > 0) {
-                    return 'status-indicator-warn';
-                }
-                return 'status-indicator-ok';
+                if (this.systemStatus.refreshing) return 'is-refreshing';
+                if (this.systemStatus.failed > 0) return 'is-warning';
+                return 'is-healthy';
+            },
+            statusLabel() {
+                if (this.systemStatus.refreshing) return '刷新中';
+                if (this.systemStatus.failed > 0) return '部分异常';
+                return '运行正常';
             },
             formattedCountdown() {
-                const seconds = this.systemStatus.nextRefreshIn;
+                const seconds = Math.max(0, Number(this.systemStatus.nextRefreshIn) || 0);
                 const minutes = Math.floor(seconds / 60);
                 const remainingSeconds = seconds % 60;
                 return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
-            }
+            },
+        },
+        watch: {
+            showSettings(open) {
+                document.body.classList.toggle('settings-open', open);
+            },
         },
         methods: {
             toggleSettings() {
                 this.showSettings = !this.showSettings;
-                if (this.showSettings) {
-                    this.getConfig();
+                if (this.showSettings) this.getConfig();
+            },
+            closeOnEscape(event) {
+                if (event.key === 'Escape' && this.showSettings) this.toggleSettings();
+            },
+            channelStatus(enabled) {
+                return enabled ? '已启用' : '未配置';
+            },
+            async getConfig() {
+                this.configLoading = true;
+                this.configError = '';
+                try {
+                    const response = await fetch('/api/config', { cache: 'no-store' });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    this.config = await response.json();
+                } catch (error) {
+                    console.error('读取配置失败:', error);
+                    this.configError = '配置暂时无法读取，请稍后重试。';
+                } finally {
+                    this.configLoading = false;
                 }
             },
-            getConfig() {
-                fetch('/api/config')
-                    .then(response => response.json())
-                    .then(data => {
-                        this.config = data;
-                    })
-                    .catch(error => console.error("Error fetching config:", error));
-            },
-        },
-        mounted() {
-            this.fullscreenLoading = false;
-            this.isPc = !window.matchMedia('(max-width: 767px)').matches;
-            
-            const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-            const connect = () => {
-                const socket = new WebSocket(protocol + window.location.host + "/ws");
-                socket.onmessage = event => {
+            connectWebSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+                const socket = new WebSocket(protocol + window.location.host + '/ws');
+
+                socket.onmessage = (event) => {
                     const message = JSON.parse(event.data);
                     if (message.type === 'status') {
                         this.systemStatus = message;
@@ -300,26 +302,26 @@
                         this.showSEOFlag = false;
                     }
                 };
-
-                const reloadHtml = () => {
-                    if (socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
-                        if (document.visibilityState === 'visible') {
-                            location.reload();
-                        }
-                    }
-                }
                 socket.onclose = () => {
-                    if (this.isPc && this.autoUpdatePush > 0) {
-                        setInterval(reloadHtml, 3000);
+                    if (this.autoUpdatePush > 0 && document.visibilityState === 'visible') {
+                        window.clearTimeout(this.reconnectTimer);
+                        this.reconnectTimer = window.setTimeout(() => this.connectWebSocket(), 3000);
                     }
                 };
-            };
-            connect();
-        }
+            },
+        },
+        mounted() {
+            document.addEventListener('keydown', this.closeOnEscape);
+            this.connectWebSocket();
+        },
+        beforeUnmount() {
+            document.removeEventListener('keydown', this.closeOnEscape);
+            document.body.classList.remove('settings-open');
+            window.clearTimeout(this.reconnectTimer);
+        },
     });
 
-    app.use(ElementPlus);
-    app.mount("#app");
+    app.mount('#app');
 </script>
 </body>
 </html>

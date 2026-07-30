@@ -1,199 +1,82 @@
+# 运行机制
 
-# 运行方式
+## 启动过程
 
-## 通知功能
-通知功能是由 **`main.go`、`utils/feed.go`、`utils/match.go` 和 `utils/notify.go`** 这四个文件协同完成的。
+程序启动时读取并校验配置文件，加载 `archives` 指向的历史链接文件，并把 `globals/static` 中的前端资源嵌入 HTTP 服务。配置文件路径可通过 `RSS_READER_CONFIG` 指定，默认是 `config.json`。
 
-其核心逻辑是：**定时抓取 RSS 源 -\> 对比新旧内容 -\> 筛选出新内容 -\> 检查新内容是否匹配关键词 -\> 如果匹配则发送通知**。
+JSON 解析后会应用环境变量覆盖，再执行统一校验。这样 Token、Webhook 和签名密钥可以只存在于进程环境中，不必写入磁盘。
 
-下面是详细的分解步骤：
+配置中的 `host` 默认为 `127.0.0.1`。为了避免意外暴露配置和阅读数据，只有显式配置其他地址时才会监听局域网或公网接口。
 
-### 1\. 触发抓取任务 (入口)
+## RSS 抓取
 
-  * **文件**: `main.go`
-  * **逻辑**:
-      * 在 `main` 函数中，您使用了一个定时任务库 `gocron` 来周期性地执行 `utils.FetchAllFeeds()` 这个函数。
-      * `FetchAllFeeds` 是整个通知流程的起点，它会遍历您在 `config.json` 中配置的所有 RSS 订阅源地址。
+`utils.UpdateFeeds` 会立即执行第一轮抓取，之后按照 `refresh` 的分钟数调度：
 
-### 2\. 获取并解析 RSS 源内容
+1. 获取一份不可变配置快照。
+2. 为每个 URL 启动抓取 worker，并等待整轮全部完成。
+3. 每个请求最多执行 20 秒。
+4. 解析结果与该订阅源的内存缓存进行比较。
+5. 更新缓存和本轮成功、失败状态。
 
-  * **文件**: `utils/feed.go`
-  * **逻辑**:
-      * `FetchAllFeeds` 函数会为每一个 RSS 链接调用 `FetchFeed` 函数。
-      * `FetchFeed` 函数负责通过 HTTP 请求获取 RSS 源的 XML 数据，并使用 `gofeed` 库将其解析成结构化的 Go 对象（`gofeed.Feed`）。
-      * 在解析完成后，它会调用 `CompareAndNotify` 函数，把新抓取到的内容和程序之前保存的旧内容进行比较。
+配置热重载会唤醒调度器并立即执行新一轮抓取。各轮任务串行，因此慢请求不会导致多个抓取周期无限叠加。
 
-### 3\. 对比新旧内容，并进行关键词匹配
+## 匹配与去重
 
-  * **文件**: `utils/feed.go` 和 `utils/match.go`
-  * **逻辑**:
-      * `CompareAndNotify` 函数是关键，它会找出本次抓取到的、但不存在于旧记录中的 **新文章** (`gofeed.Item`)。
-      * 对于每一篇新文章，它会调用 `match.Match` 函数来进行关键词匹配。
-      * `match.Match` 函数会读取 `config.json` 中您为每个订阅源配置的 `MustContain`（必须包含）和 `MustNotContain`（必须不包含）这两个关键词列表。
-      * 它会检查新文章的标题 (`item.Title`) 是否满足您设定的关键词规则。只有当文章标题**包含了至少一个 `MustContain` 的词**，并且**没有包含任何 `MustNotContain` 的词**时，才算匹配成功。
+文章标题与 `keywords` 中的任意关键词进行不区分大小写的包含匹配。空关键词会被忽略，重复关键词会在配置加载时合并。
 
-### 4\. 发送通知
+命中后，程序先为规范化文章链接创建“处理中”预留。该操作使用互斥锁，因此多个订阅源或 worker 同时遇到相同链接时，只有一个能够发送通知。
 
-  * **文件**: `utils/notify.go`
-  * **逻辑**:
-      * 如果 `match.Match` 函数返回 `true`（即关键词匹配成功），`CompareAndNotify` 就会调用 `SendFeedsToTg` 函数来发送通知。
-      * `SendFeedsToTg` 函数负责构建发送给 Telegram Bot 的消息内容，主要是文章的标题和链接。
-      * 最后，它会调用 `send` 函数，该函数通过向 `https://api.telegram.org/bot<token>/sendMessage` 这个地址发送 POST 请求，最终将消息推送到您指定的 Telegram 聊天中。
+通知至少成功投递到一个已配置渠道后，链接才会追加到归档文件。全部渠道失败时会释放预留，使后续抓取仍有机会重试。
 
------
+## 通知渠道
 
-### 逻辑流程图
+通知路由定义在 `utils/notify.go`：
 
-为了更直观，整个流程可以总结如下：
+- Telegram 使用 Markdown V2 消息。
+- 飞书使用文本消息。
+- 钉钉使用链接消息，并支持 HMAC-SHA256 签名。
 
-```
-[ main.go ]         [ utils/feed.go ]            [ utils/match.go ]        [ utils/notify.go ]
-gocron 定时器  ──>  FetchAllFeeds()      
-                      │
-                      └─> FetchFeed()
-                            │
-                            └─> CompareAndNotify()  ────> Match() ────┐
-                                  (如果匹配成功) │                      │ (返回 true/false)
-                                                 └───────────────────────> SendFeedsToTg()
-                                                                             │
-                                                                             └─> send()
-                                                                                   (HTTP POST to Telegram API)
-```
+通知 HTTP 客户端具有 15 秒超时，只把 2xx 响应视为成功，并限制错误响应体的读取大小。Telegram 和钉钉请求在进程内按渠道串行限速。
 
-### 通知样式
-Telegram的通知样式
-“”“
-titlele
-来源：源名称
-时间：时间
-链接
-”“”
+抓取和通知请求都继承应用级 Context。收到 `SIGINT` 或 `SIGTERM` 时，正在等待限速或执行 HTTP 请求的任务会立即取消。
 
+## Web 页面
 
-## 日志输出
-项目主要使用 Go 语言内置的 `log` 包来输出日志。这个包的功能直接、高效，会将日志信息打印到标准错误流（`stderr`），运行程序时看到的控制台输出。
+首页首先使用 Go 模板渲染已有缓存，然后建立 WebSocket：
 
-整个日志输出的流程可以分为以下几个关键环节：
+- 每秒接收订阅源数量、成功数、失败数和下次后端抓取倒计时。
+- 如果页面建立连接时首轮抓取尚未完成，首批数据会在可用后立即发送。
+- 后续内容按 `autoUpdatePush` 配置的分钟间隔进行变化检查。
 
-### 1\. 日志记录的“源头”
+`GET /api/config` 只返回监听地址、刷新设置、去掉路径和参数的订阅域名，以及各通知渠道是否已配置。它不会返回 Token、Webhook、签名、Chat ID 或带认证参数的订阅 URL。该接口不接受写请求。
 
-日志信息主要在以下几个文件中通过调用 `log.Printf()` 或 `log.Println()` 来生成：
+`GET /healthz` 用于进程存活检查；`GET /readyz` 只有在首轮抓取结束后才返回就绪。Dockerfile 使用前者作为容器健康检查。
 
-  * **`utils/feed.go`**: 这是日志最密集的文件，记录了 RSS 处理过程中的关键事件。
+## 配置热重载
 
-      * `log.Printf("timer exec get: %s\n", url)`: **【周期性任务】** 当定时器触发，开始抓取一个新的 RSS 源时，会打印这条日志，告诉您正在处理哪个 URL。
-      * `log.Printf("Error fetching feed: %v | %v", url, err)`: **【错误】** 如果在通过 HTTP 请求获取或解析 RSS 源时发生任何网络错误或格式错误，会打印这条日志。
-      * `log.Printf("Error getting feed from db is null %v", url)`: **【警告】** 在尝试从内存缓存中获取一个订阅源的数据，但没有找到时，会打印这条日志。
-      * `log.Println("文件已修改")`, `log.Println("错误:", err)`: **【文件监控】** 当 `config.json` 配置文件发生变化或监控出错时，会打印这些日志。
+程序监控 `config.json` 所在目录，因此编辑器通过“临时文件 + 重命名”方式保存时也能检测到变化。新配置只有在 JSON 解析和字段校验全部通过后才会切换；失败时记录错误并继续使用旧配置。
 
-  * **`utils/notify.go`**: 这个文件负责记录与发送通知相关的日志。
+热重载支持订阅源、关键词、抓取间隔、前端推送间隔、归档路径和通知设置。监听地址与端口需要重启进程才能变化。
 
-      * `log.Printf("json marshal err: %+v\n", err)`: **【错误】** 在将要发送的消息内容序列化成 JSON 格式时如果失败，会打印此错误。
-      * `log.Printf("http post err: %+v\n", err)`, `log.Printf("http post read body err: %+v\n", err)`: **【网络错误】** 在向飞书、钉钉或 Telegram 的 API 发送 HTTP POST 请求时，如果出现网络问题或读取响应失败，会记录这些错误。
-      * `log.Printf("response status: %s,response body:%s", string(body), resp.Status)`: **【成功/失败回执】** 这是**最重要**的通知日志。无论发送成功还是失败，它都会打印出通知服务 API 返回的**状态码和具体响应内容**。如果您发现通知没收到，检查这条日志可以最快地定位问题。
+环境变量本身不会产生文件系统事件，修改环境变量后需要重启进程。
 
-  * **`main.go`**: 作为程序的入口，它主要记录一些启动和初始化阶段的日志。
+## 并发模型
 
-      * `log.Println("WebSocket 链接已打开")`, `log.Println("WebSocket 链接已关闭")`: **【WebSocket 状态】** 记录了前端页面与后端 WebSocket 连接的建立与断开事件。
-      * `log.Printf("模板加载错误: %v", err)`: **【严重错误】** 如果 `index.html` 模板文件加载失败，会导致前端页面无法渲染，这条日志会记录相关错误。
-      * `log.Printf("Server started on :%s", globals.Conf.Port)`: **【启动信息】** 程序成功启动并开始监听指定端口时，会打印这条日志。
+运行时状态拆分为三个锁域：
 
-### 2\. 日志输出流程图
+- 配置锁：保护当前配置快照。
+- Feed 锁：保护内存中的订阅缓存。
+- 归档锁：保护已通知和正在通知的链接集合，同时串行化归档写入。
 
-为了更直观地理解，整个流程可以概括为：
+成功数、失败数、刷新状态和下次刷新时间使用原子操作维护。调用方不直接持有内部 map 或配置切片，从而避免热重载、WebSocket 和抓取 worker 之间的数据竞争。
 
-```
-+-------------------+      +-------------------------+      +-----------------------+
-|     main.go       |----->|      utils/feed.go      |----->|     utils/match.go    |
-| (程序启动、Web服务) |      | (定时抓取、解析、比较)    |      | (关键词匹配，无日志)  |
-+-------------------+      +-------------------------+      +-----------------------+
-        |                            |                                |
-        | (WebSocket连接)            | (发现新内容且匹配成功)           |
-        |                            ▼                                |
-        |                  +-------------------------+                |
-        └─────────────────>|     utils/notify.go     |<───────────────┘
-                           | (构建消息、HTTP发送、记录结果) |
-                           +-------------------------+
-                                      |
-                                      ▼
-                           +-------------------------+
-                           |      控制台/终端输出      |
-                           +-------------------------+
-```
+## 关闭流程
 
-### 总结
+程序使用统一的应用 Context 管理 HTTP 服务、配置监控、抓取任务、WebSocket 和通知请求。收到退出信号后：
 
-后台日志输出流程：
+1. 取消抓取和文件监控。
+2. 关闭 WebSocket 并停止接收新 HTTP 请求。
+3. 给 HTTP 服务最多 10 秒完成收尾。
+4. 等待已经创建的通知任务退出。
 
-1.  **起点**：由 `main.go` 中的定时器 `gocron` 触发，或由 `fsnotify` 文件监控器触发。
-2.  **核心处理**：`utils/feed.go` 执行 RSS 的抓取和内容比对，并在此过程中记录关键的操作和错误日志。
-3.  **通知与结果**：当 `feed.go` 中的 `Check` 函数确认有新内容且关键词匹配成功后，会调用 `utils/notify.go` 中的函数。
-4.  **最终输出**：`notify.go` 在尝试发送通知后，会**将远程 API 的返回结果打印成日志**，这是判断通知是否成功发出的关键依据。
-5.  **所有日志**：最终都会通过 Go 内置的 `log` 包输出到您运行程序的控制台界面。
-
-## 持久化归档功能
-
-`archives.txt` 文件是项目的**持久化归档数据库**，它的核心作用是**防止程序在重启后，对同一篇文章发送重复的通知**。
-
-简单来说，它就是一个“**已发送通知历史记录**”文件。
-
------
-
-### 它是如何工作的？
-
-整个流程涉及到两个文件：`globals/global.go`（负责读写文件）和 `utils/feed.go`（负责业务逻辑）。
-
-#### 1\. 程序启动阶段：加载历史记录
-
-  * **文件**: `globals/global.go`
-  * **函数**: `Init()`
-  * **逻辑**: 当您的程序一启动，`globals.Init()` 函数就会被调用。在这个函数里，程序会读取 `archives.txt` 文件的**全部内容**。然后，它会把文件里的**每一行（也就是每一个已发送过的文章链接）**，都加载到一个名为 `globals.Hash` 的内存哈希表（map）中。
-  * **结果**: 这样，程序在内存里就有了一份快速、高效的“已发送链接”的临时数据库。
-
-#### 2\. 核心处理阶段：检查与追加
-
-  * **文件**: `utils/feed.go`
-  * **函数**: `Check(...)`
-  * **逻辑**: 这是整个流程最关键的地方。
-    1.  当 `UpdateFeeds` 定时任务抓取到一篇新文章时，会调用 `Check` 函数来处理它。
-    2.  在 `Check` 函数内部，程序首先会清理这篇文章的链接（`v.Link`），去除网址参数等无关信息。
-    3.  然后，它会立即检查这个清理后的链接是否存在于我们第一步加载到内存的 `globals.Hash` 哈希表中 (`_, fileCacheOk := globals.Hash[link]`)。
-    4.  **如果链接已存在** (`if fileCacheOk`)，说明这篇文章我们过去已经发送过通知了。程序会立刻 `return`，**停止后续所有操作**，从而避免了重复发送。
-    5.  **如果链接不存在**，程序会继续进行关键词匹配 (`MatchStr`)。
-    6.  如果关键词匹配成功，程序会执行以下两个核心操作：
-          * **发送通知**：`go Notify(...)`
-          * **写入归档**：`globals.WriteFile(globals.RssUrls.Archives, link)`
-
-#### 3\. 写入文件阶段：追加内容
-
-  * **文件**: `globals/global.go`
-  * **函数**: `WriteFile(...)`
-  * **逻辑**:
-      * `utils/feed.go` 调用的 `globals.WriteFile` 函数，会以\*\*追加模式（append）\*\*打开 `archives.txt` 文件。
-      * 然后，它会将刚刚成功发送通知的那篇文章的链接，作为**新的一行**写入到文件的末尾。
-      * 同时，这个链接也会被添加到内存中的 `globals.Hash` 哈希表里，确保在程序运行期间也不会重复处理。
-
-**代码摘要 (`utils/feed.go`):**
-
-```go
-        // 匹配关键词
-        MatchStr(v.Title, func(msg string) {
-            _, fileCacheOk = globals.Hash[link]
-            if fileCacheOk {
-                return // 如果内存中已存在，则不处理
-            } else {
-                globals.Hash[link] = 1 // 加入内存缓存
-                // 发送通知
-                go Notify(Message{
-                    Routes:   []string{FeiShuRoute, TelegramRoute, DingtalkRoute},
-                    Content:  fmt.Sprintf("%s\n%s", msg, v.Link),
-                    FeedItem: *v,
-                })
-                // 将链接写入 archives.txt 文件
-                globals.WriteFile(globals.RssUrls.Archives, link)
-            }
-        })
-```
-
-**总结一下**：`archives.txt` 是项目实现“幂等性”（即多次执行相同操作，结果都一样）的关键。没有它，每次重启程序，都会把所有 RSS 源里的文章当成新的来处理一遍，从而导致通知泛滥。
-
+这一流程同时适用于终端 `Ctrl+C`、Docker 停止和编排平台滚动更新。

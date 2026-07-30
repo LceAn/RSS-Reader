@@ -1,0 +1,9 @@
+# Local runtime configuration and state
+config.json
+archives.txt
+
+# Build output
+rss-reader
+rss-reader.exe
+*.log
+.smoke/

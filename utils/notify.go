@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -9,15 +10,27 @@ import (
 	"fmt"
 	"github.com/mmcdole/gofeed"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"rss-reader/globals"
+	"rss-reader/models"
 	"strings"
+	"sync"
 	"time"
 )
 
-var notifyLogger = NewLogger("NOTIFY")
+var (
+	notifyLogger           = NewLogger("NOTIFY")
+	notificationHTTPClient = &http.Client{
+		Timeout: 15 * time.Second,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	telegramLimiter       routeLimiter
+	dingtalkLimiter       routeLimiter
+	notificationWaitGroup sync.WaitGroup
+)
 
 const (
 	FeiShuRoute   = "feishu"
@@ -31,6 +44,54 @@ type Message struct {
 	Routes   []string    `json:"routes"`
 	Content  string      `json:"content"`
 	FeedItem gofeed.Item `json:"feedItem"`
+}
+
+type NotifyResult struct {
+	Sent int
+	Err  error
+}
+
+type routeLimiter struct {
+	mu       sync.Mutex
+	lastSent time.Time
+}
+
+func (limiter *routeLimiter) wait(ctx context.Context, minimumInterval time.Duration) error {
+	limiter.mu.Lock()
+	defer limiter.mu.Unlock()
+	if waitFor := minimumInterval - time.Since(limiter.lastSent); waitFor > 0 {
+		timer := time.NewTimer(waitFor)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+	limiter.lastSent = time.Now()
+	return nil
+}
+
+func dispatchNotification(ctx context.Context, callback func(context.Context)) {
+	notificationWaitGroup.Add(1)
+	go func() {
+		defer notificationWaitGroup.Done()
+		callback(ctx)
+	}()
+}
+
+func WaitForNotifications(ctx context.Context) error {
+	done := make(chan struct{})
+	go func() {
+		notificationWaitGroup.Wait()
+		close(done)
+	}()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-done:
+		return nil
+	}
 }
 
 type FeiShuMessage struct {
@@ -48,9 +109,9 @@ type FeiShuMessageText struct {
 // }
 
 type TelegramMessage struct {
-    ChatId    string `json:"chat_id"`
-    Text      string `json:"text"`
-    ParseMode string `json:"parse_mode,omitempty"`
+	ChatId    string `json:"chat_id"`
+	Text      string `json:"text"`
+	ParseMode string `json:"parse_mode,omitempty"`
 }
 
 type DingtalkMessage struct {
@@ -64,55 +125,80 @@ type DingtalkMessageLink struct {
 	Title      string `json:"title"`
 }
 
-func Notify(msg Message) {
+func Notify(ctx context.Context, msg Message) NotifyResult {
 	if msg.Routes == nil || len(msg.Routes) == 0 {
-		return
+		return NotifyResult{Err: fmt.Errorf("no notification routes requested")}
 	}
+
+	config := globals.GetConfig()
+	var result NotifyResult
+	errors := make([]string, 0)
 	for _, route := range msg.Routes {
+		var err error
 		switch route {
 		case FeiShuRoute:
-			if globals.RssUrls.Notify.FeiShu.API != "" {
-				sendToFeiShu(msg)
+			if config.Notify.FeiShu.API == "" {
+				continue
 			}
+			err = sendToFeiShu(ctx, config, msg)
 		case TelegramRoute:
-			if globals.RssUrls.Notify.Telegram.Token != "" && globals.RssUrls.Notify.Telegram.ChatId != "" {
-				time.Sleep(1500)
-				sendToTelegram(msg)
+			if config.Notify.Telegram.Token == "" && config.Notify.Telegram.ChatId == "" && config.Notify.Telegram.API == "" {
+				continue
+			}
+			if err = telegramLimiter.wait(ctx, 1500*time.Millisecond); err == nil {
+				err = sendToTelegram(ctx, config, msg)
 			}
 		case DingtalkRoute:
-			if globals.RssUrls.Notify.Dingtalk.Webhook != "" {
-				time.Sleep(1500)
-				sendToDingtalk(msg)
+			if config.Notify.Dingtalk.Webhook == "" {
+				continue
+			}
+			if err = dingtalkLimiter.wait(ctx, 1500*time.Millisecond); err == nil {
+				err = sendToDingtalk(ctx, config, msg)
 			}
 		default:
-			notifyLogger.Warn("without route")
+			err = fmt.Errorf("unknown route %q", route)
 		}
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %v", route, err))
+			continue
+		}
+		result.Sent++
 	}
-}
-func sendToTelegram(msg Message) {
-    finalMsg, err := json.Marshal(
-        TelegramMessage{
-            ChatId:    globals.RssUrls.Notify.Telegram.ChatId,
-            Text:      msg.Content,
-            ParseMode: "MarkdownV2", // 告诉 Telegram 使用 Markdown V2 解析
-        })
-    if err != nil {
-        notifyLogger.Error("json marshal err: %+v\n", err)
-        return
-    }
-    api := strings.ReplaceAll(globals.RssUrls.Notify.Telegram.API, TokenReplace, globals.RssUrls.Notify.Telegram.Token)
-    requestPost(api, finalMsg)
+	if len(errors) > 0 {
+		result.Err = fmt.Errorf("%s", strings.Join(errors, "; "))
+	} else if result.Sent == 0 {
+		result.Err = fmt.Errorf("no notification routes are configured")
+	}
+	return result
 }
 
-func sendToDingtalk(msg Message) {
+func sendToTelegram(ctx context.Context, config models.Config, msg Message) error {
+	telegram := config.Notify.Telegram
+	if telegram.API == "" || telegram.Token == "" || telegram.ChatId == "" {
+		return fmt.Errorf("incomplete Telegram configuration")
+	}
+	finalMsg, err := json.Marshal(
+		TelegramMessage{
+			ChatId:    telegram.ChatId,
+			Text:      msg.Content,
+			ParseMode: "MarkdownV2",
+		})
+	if err != nil {
+		return fmt.Errorf("marshal request: %w", err)
+	}
+	api := strings.ReplaceAll(telegram.API, TokenReplace, telegram.Token)
+	return requestPost(ctx, api, finalMsg)
+}
+
+func sendToDingtalk(ctx context.Context, config models.Config, msg Message) error {
 	//签名
 	encodedSign := ""
 	var timestamp int64
-	if globals.RssUrls.Notify.Dingtalk.Sign != "" {
+	if config.Notify.Dingtalk.Sign != "" {
 
 		// 获取当前时间戳（毫秒）
 		timestamp = time.Now().UnixNano() / int64(time.Millisecond)
-		secret := globals.RssUrls.Notify.Dingtalk.Sign
+		secret := config.Notify.Dingtalk.Sign
 		// 拼接字符串
 		stringToSign := fmt.Sprintf("%d\n%s", timestamp, secret)
 		// 计算HMAC-SHA256签名
@@ -121,8 +207,7 @@ func sendToDingtalk(msg Message) {
 		signData := mac.Sum(nil)
 		// 进行Base64编码
 		sign := base64.StdEncoding.EncodeToString(signData)
-		// 对签名进行URL编码
-		encodedSign = url.QueryEscape(sign)
+		encodedSign = sign
 	}
 
 	finalMsg, err := json.Marshal(
@@ -135,18 +220,25 @@ func sendToDingtalk(msg Message) {
 			},
 		})
 	if err != nil {
-		notifyLogger.Error("json marshal err: %+v\n", err)
-		return
+		return fmt.Errorf("marshal request: %w", err)
 	}
-	api := globals.RssUrls.Notify.Dingtalk.Webhook
+	api := config.Notify.Dingtalk.Webhook
 	if encodedSign != "" {
-		api = fmt.Sprintf("%s&timestamp=%d&sign=%s", api, timestamp, encodedSign)
+		parsedAPI, err := url.Parse(api)
+		if err != nil {
+			return fmt.Errorf("parse webhook URL: %w", err)
+		}
+		query := parsedAPI.Query()
+		query.Set("timestamp", fmt.Sprintf("%d", timestamp))
+		query.Set("sign", encodedSign)
+		parsedAPI.RawQuery = query.Encode()
+		api = parsedAPI.String()
 	}
 
-	requestPost(api, finalMsg)
+	return requestPost(ctx, api, finalMsg)
 }
 
-func sendToFeiShu(msg Message) {
+func sendToFeiShu(ctx context.Context, config models.Config, msg Message) error {
 	finalMsg, err := json.Marshal(
 		FeiShuMessage{
 			MsgType: "text",
@@ -155,19 +247,22 @@ func sendToFeiShu(msg Message) {
 			},
 		})
 	if err != nil {
-		notifyLogger.Error("json marshal err: %+v\n", err)
-		return
+		return fmt.Errorf("marshal request: %w", err)
 	}
-	requestPost(globals.RssUrls.Notify.FeiShu.API, finalMsg)
+	return requestPost(ctx, config.Notify.FeiShu.API, finalMsg)
 }
 
-func requestPost(url string, param []byte) {
+func requestPost(ctx context.Context, endpoint string, param []byte) error {
 	requestBody := bytes.NewBuffer(param)
-	resp, err := http.Post(url, ContentType, requestBody)
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, requestBody)
+	if err != nil {
+		return fmt.Errorf("invalid notification endpoint")
+	}
+	request.Header.Set("Content-Type", ContentType)
+	resp, err := notificationHTTPClient.Do(request)
 
 	if err != nil {
-		notifyLogger.Error("HTTP POST request failed: %v", err)
-		return
+		return fmt.Errorf("HTTP POST request failed: %w", networkError(err))
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -175,16 +270,13 @@ func requestPost(url string, param []byte) {
 			notifyLogger.Error("http body close err: %+v\n", err)
 		}
 	}(resp.Body)
-	body, err := ioutil.ReadAll(resp.Body) // 读取响应内容
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		notifyLogger.Error("http post read body err: %+v\n", err)
-		return
+		return fmt.Errorf("read HTTP response: %w", err)
 	}
-	if resp.StatusCode >= 400 {
-		notifyLogger.Error("Notification API response error status=\"%s\", body=%s", resp.Status, string(body))
-	} else {
-		notifyLogger.Info("Notification API response success status=\"%s\", body=%s", resp.Status, string(body))
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("notification API returned status=%q, body=%s", resp.Status, string(body))
 	}
-	//string(body)
-	return
+	notifyLogger.Info("Notification API response success status=\"%s\"", resp.Status)
+	return nil
 }
