@@ -14,6 +14,8 @@ import (
 )
 
 var (
+	reloadMu sync.Mutex
+
 	configMu sync.RWMutex
 	config   models.Config
 
@@ -45,6 +47,9 @@ func Init() {
 // ReloadConfig validates a new configuration before atomically publishing it.
 // Existing feed cache entries are retained when their URL is still configured.
 func ReloadConfig() error {
+	reloadMu.Lock()
+	defer reloadMu.Unlock()
+
 	newConfig, err := models.ParseConf()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)

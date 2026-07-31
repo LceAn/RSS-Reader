@@ -6,9 +6,12 @@ services:
       - "127.0.0.1:8080:8080"
     environment:
       RSS_READER_HOST: 0.0.0.0
+      RSS_READER_CONFIG: /app/data/config.json
+      RSS_READER_CONFIG_SEED: /app/config.seed.json
       RSS_READER_ARCHIVES: /app/data/archives.txt
+      RSS_READER_ADMIN_PASSWORD: ${RSS_READER_ADMIN_PASSWORD:-}
     volumes:
-      - ./config.json:/app/config.json:ro
+      - ./config.json:/app/config.seed.json:ro
       - rss-reader-data:/app/data
 
 volumes:

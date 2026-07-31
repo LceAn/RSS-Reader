@@ -139,58 +139,135 @@
     <transition name="drawer">
         <aside v-if="showSettings" class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
             <header class="settings-header">
-                <h2 id="settings-title">设置</h2>
-                <button class="close-btn" type="button" aria-label="关闭设置" @click="toggleSettings">
-                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
-                </button>
+                <div class="settings-heading">
+                    <h2 id="settings-title">{{ editing ? '编辑设置' : '设置' }}</h2>
+                    <span class="access-state" :class="{ active: adminSession.authenticated }">{{ adminAccessLabel }}</span>
+                </div>
+                <div class="settings-header-actions">
+                    <button v-if="adminSession.enabled && !adminSession.authenticated" class="header-command" type="button"
+                            @click="loginVisible = !loginVisible">{{ loginVisible ? '取消' : '登录' }}</button>
+                    <button v-if="adminSession.authenticated && !editing" class="header-command" type="button"
+                            @click="startEditing">编辑</button>
+                    <button v-if="adminSession.authenticated && !editing" class="header-command subtle" type="button"
+                            @click="logout">退出</button>
+                    <button class="close-btn" type="button" aria-label="关闭设置" @click="toggleSettings">
+                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+                    </button>
+                </div>
             </header>
 
             <div class="settings-content" v-if="!configLoading && !configError">
-                <section class="settings-section">
-                    <div class="settings-section-title">
-                        <h3>运行</h3>
+                <form v-if="loginVisible && !adminSession.authenticated" class="admin-login" @submit.prevent="login">
+                    <label for="admin-password">管理员密码</label>
+                    <div class="login-row">
+                        <input id="admin-password" v-model="adminPassword" type="password" autocomplete="current-password"
+                               minlength="12" required autofocus>
+                        <button class="primary-action" type="submit" :disabled="loginLoading">
+                            {{ loginLoading ? '登录中' : '登录' }}
+                        </button>
                     </div>
-                    <dl class="settings-list">
-                        <div><dt>监听地址</dt><dd>{{ config.host }}:{{ config.port }}</dd></div>
-                        <div><dt>刷新频率</dt><dd>{{ config.refresh }} 分钟</dd></div>
-                        <div><dt>前端推送</dt><dd>{{ config.autoUpdatePush > 0 ? `${config.autoUpdatePush} 分钟` : '已关闭' }}</dd></div>
-                        <div><dt>列表高度</dt><dd>{{ config.listHeight }} px</dd></div>
-                    </dl>
-                </section>
+                    <p class="form-message error" v-if="loginError">{{ loginError }}</p>
+                </form>
 
-                <section class="settings-section">
-                    <div class="settings-section-title">
-                        <h3>监听关键词</h3>
-                    </div>
-                    <div class="tag-list" v-if="config.keywords && config.keywords.length">
-                        <span class="keyword-tag" v-for="keyword in config.keywords" :key="keyword">{{ keyword }}</span>
-                    </div>
-                    <p class="empty-state" v-else>当前未配置监听关键词</p>
-                </section>
+                <p class="form-message error" v-if="adminError">{{ adminError }}</p>
+                <p class="form-message success" v-if="settingsNotice">{{ settingsNotice }}</p>
 
-                <section class="settings-section">
-                    <div class="settings-section-title">
-                        <h3>订阅源 <span>{{ config.feeds ? config.feeds.length : 0 }}</span></h3>
-                    </div>
-                    <ul class="source-list" v-if="config.feeds && config.feeds.length">
-                        <li v-for="feed in config.feeds" :key="feed">
-                            <span class="source-icon" aria-hidden="true"></span>
-                            <span>{{ feed }}</span>
-                        </li>
-                    </ul>
-                    <p class="empty-state" v-else>当前未配置订阅源</p>
-                </section>
+                <template v-if="!editing">
+                    <section class="settings-section">
+                        <div class="settings-section-title">
+                            <h3>运行</h3>
+                        </div>
+                        <dl class="settings-list">
+                            <div><dt>监听地址</dt><dd>{{ config.host }}:{{ config.port }}</dd></div>
+                            <div><dt>刷新频率</dt><dd>{{ config.refresh }} 分钟</dd></div>
+                            <div><dt>前端推送</dt><dd>{{ config.autoUpdatePush > 0 ? `${config.autoUpdatePush} 分钟` : '已关闭' }}</dd></div>
+                            <div><dt>列表高度</dt><dd>{{ config.listHeight }} px</dd></div>
+                        </dl>
+                    </section>
 
-                <section class="settings-section">
-                    <div class="settings-section-title">
-                        <h3>通知</h3>
+                    <section class="settings-section">
+                        <div class="settings-section-title">
+                            <h3>监听关键词</h3>
+                        </div>
+                        <div class="tag-list" v-if="config.keywords && config.keywords.length">
+                            <span class="keyword-tag" v-for="keyword in config.keywords" :key="keyword">{{ keyword }}</span>
+                        </div>
+                        <p class="empty-state" v-else>当前未配置监听关键词</p>
+                    </section>
+
+                    <section class="settings-section">
+                        <div class="settings-section-title">
+                            <h3>订阅源 <span>{{ config.feeds ? config.feeds.length : 0 }}</span></h3>
+                        </div>
+                        <ul class="source-list" v-if="config.feeds && config.feeds.length">
+                            <li v-for="feed in config.feeds" :key="feed">
+                                <span class="source-icon" aria-hidden="true"></span>
+                                <span>{{ feed }}</span>
+                            </li>
+                        </ul>
+                        <p class="empty-state" v-else>当前未配置订阅源</p>
+                    </section>
+
+                    <section class="settings-section">
+                        <div class="settings-section-title">
+                            <h3>通知</h3>
+                        </div>
+                        <ul class="notify-list">
+                            <li><span>Telegram</span><strong :class="{ enabled: config.notify && config.notify.telegram }">{{ channelStatus(config.notify && config.notify.telegram) }}</strong></li>
+                            <li><span>飞书</span><strong :class="{ enabled: config.notify && config.notify.feishu }">{{ channelStatus(config.notify && config.notify.feishu) }}</strong></li>
+                            <li><span>钉钉</span><strong :class="{ enabled: config.notify && config.notify.dingtalk }">{{ channelStatus(config.notify && config.notify.dingtalk) }}</strong></li>
+                        </ul>
+                    </section>
+                </template>
+
+                <form v-else class="settings-editor" @submit.prevent="saveAdminConfig">
+                    <section class="settings-section editor-section">
+                        <div class="settings-section-title"><h3>运行</h3></div>
+                        <div class="locked-setting"><span>监听地址</span><strong>{{ config.host }}:{{ config.port }}</strong></div>
+                        <div class="field-list">
+                            <label class="editor-field">
+                                <span>刷新频率</span>
+                                <span class="number-field"><input v-model.number="adminConfig.refresh" type="number" min="1" max="10080" required><em>分钟</em></span>
+                            </label>
+                            <label class="editor-field">
+                                <span>前端推送</span>
+                                <span class="number-field"><input v-model.number="adminConfig.autoUpdatePush" type="number" min="0" max="10080" required><em>分钟</em></span>
+                            </label>
+                            <label class="editor-field">
+                                <span>列表高度</span>
+                                <span class="number-field"><input v-model.number="adminConfig.listHeight" type="number" min="240" max="1600" required><em>px</em></span>
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="settings-section editor-section">
+                        <div class="settings-section-title"><h3>监听关键词 <span>{{ adminConfig.keywords.length }}</span></h3></div>
+                        <div class="editor-rows">
+                            <div class="editor-row" v-for="(keyword, index) in adminConfig.keywords" :key="`keyword-${index}`">
+                                <input v-model="adminConfig.keywords[index]" type="text" maxlength="128" :aria-label="`关键词 ${index + 1}`">
+                                <button class="remove-row" type="button" title="删除关键词" :aria-label="`删除关键词 ${index + 1}`" @click="removeKeyword(index)">&times;</button>
+                            </div>
+                            <button class="add-row" type="button" @click="addKeyword"><span aria-hidden="true">+</span> 添加关键词</button>
+                        </div>
+                    </section>
+
+                    <section class="settings-section editor-section">
+                        <div class="settings-section-title"><h3>订阅源 <span>{{ adminConfig.feeds.length }}</span></h3></div>
+                        <div class="editor-rows">
+                            <div class="editor-row feed-editor-row" v-for="(feed, index) in adminConfig.feeds" :key="`feed-${index}`">
+                                <input v-model="adminConfig.feeds[index]" type="url" maxlength="2048" placeholder="https://example.com/feed.xml" :aria-label="`订阅源 ${index + 1}`">
+                                <button class="remove-row" type="button" title="删除订阅源" :aria-label="`删除订阅源 ${index + 1}`" @click="removeFeed(index)">&times;</button>
+                            </div>
+                            <button class="add-row" type="button" @click="addFeed"><span aria-hidden="true">+</span> 添加订阅源</button>
+                        </div>
+                    </section>
+
+                    <p class="form-message error" v-if="saveError">{{ saveError }}</p>
+                    <div class="editor-actions">
+                        <button class="secondary-action" type="button" :disabled="saveLoading" @click="cancelEditing">取消</button>
+                        <button class="primary-action" type="submit" :disabled="saveLoading">{{ saveLoading ? '保存中' : '保存' }}</button>
                     </div>
-                    <ul class="notify-list">
-                        <li><span>Telegram</span><strong :class="{ enabled: config.notify && config.notify.telegram }">{{ channelStatus(config.notify && config.notify.telegram) }}</strong></li>
-                        <li><span>飞书</span><strong :class="{ enabled: config.notify && config.notify.feishu }">{{ channelStatus(config.notify && config.notify.feishu) }}</strong></li>
-                        <li><span>钉钉</span><strong :class="{ enabled: config.notify && config.notify.dingtalk }">{{ channelStatus(config.notify && config.notify.dingtalk) }}</strong></li>
-                    </ul>
-                </section>
+                </form>
             </div>
 
             <div class="panel-state" v-else-if="configLoading">
@@ -199,7 +276,7 @@
             </div>
             <div class="panel-state panel-error" v-else>
                 <p>{{ configError }}</p>
-                <button type="button" @click="getConfig">重新加载</button>
+                <button type="button" @click="loadSettings">重新加载</button>
             </div>
         </aside>
     </transition>
@@ -235,10 +312,32 @@
                     feeds: [],
                     notify: {},
                 },
+                adminSession: {
+                    enabled: false,
+                    authenticated: false,
+                },
+                csrfToken: '',
+                loginVisible: false,
+                adminPassword: '',
+                loginLoading: false,
+                loginError: '',
+                adminError: '',
+                editing: false,
+                adminConfig: null,
+                adminETag: '',
+                saveLoading: false,
+                saveError: '',
+                settingsNotice: '',
                 reconnectTimer: null,
+                noticeTimer: null,
             };
         },
         computed: {
+            adminAccessLabel() {
+                if (!this.adminSession.enabled) return '只读';
+                if (this.adminSession.authenticated) return '管理员';
+                return '锁定';
+            },
             indicatorClass() {
                 if (this.systemStatus.refreshing) return 'is-refreshing';
                 if (this.systemStatus.failed > 0) return 'is-warning';
@@ -264,7 +363,11 @@
         methods: {
             toggleSettings() {
                 this.showSettings = !this.showSettings;
-                if (this.showSettings) this.getConfig();
+                if (this.showSettings) {
+                    this.loadSettings();
+                } else {
+                    this.resetAdminView();
+                }
             },
             closeOnEscape(event) {
                 if (event.key === 'Escape' && this.showSettings) this.toggleSettings();
@@ -272,19 +375,185 @@
             channelStatus(enabled) {
                 return enabled ? '已启用' : '未配置';
             },
-            async getConfig() {
+            async loadSettings() {
                 this.configLoading = true;
                 this.configError = '';
                 try {
-                    const response = await fetch('/api/config', { cache: 'no-store' });
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    this.config = await response.json();
+                    const [configResponse, sessionResponse] = await Promise.all([
+                        fetch('/api/config', { cache: 'no-store' }),
+                        fetch('/api/auth/session', { cache: 'no-store' }),
+                    ]);
+                    if (!configResponse.ok || !sessionResponse.ok) throw new Error('settings request failed');
+                    this.config = await configResponse.json();
+                    const session = await sessionResponse.json();
+                    this.adminSession = {
+                        enabled: Boolean(session.enabled),
+                        authenticated: Boolean(session.authenticated),
+                    };
+                    this.csrfToken = session.csrfToken || '';
                 } catch (error) {
                     console.error('读取配置失败:', error);
                     this.configError = '配置暂时无法读取，请稍后重试。';
                 } finally {
                     this.configLoading = false;
                 }
+            },
+            async login() {
+                this.loginLoading = true;
+                this.loginError = '';
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ password: this.adminPassword }),
+                    });
+                    if (!response.ok) throw new Error(await this.responseError(response, '登录失败'));
+                    const session = await response.json();
+                    this.adminSession = { enabled: true, authenticated: true };
+                    this.csrfToken = session.csrfToken || '';
+                    this.adminPassword = '';
+                    this.loginVisible = false;
+                    await this.startEditing();
+                } catch (error) {
+                    this.loginError = error.message || '登录失败';
+                } finally {
+                    this.loginLoading = false;
+                }
+            },
+            async logout() {
+                try {
+                    await fetch('/api/auth/logout', {
+                        method: 'POST',
+                        headers: { 'X-CSRF-Token': this.csrfToken },
+                    });
+                } finally {
+                    this.adminSession.authenticated = false;
+                    this.csrfToken = '';
+                    this.resetAdminView();
+                }
+            },
+            async startEditing() {
+                if (!this.adminSession.authenticated) {
+                    this.loginVisible = true;
+                    return;
+                }
+                this.saveError = '';
+                this.adminError = '';
+                this.settingsNotice = '';
+                try {
+                    const response = await fetch('/api/admin/config', { cache: 'no-store' });
+                    if (response.status === 401) {
+                        this.adminSession.authenticated = false;
+                        this.csrfToken = '';
+                        this.loginVisible = true;
+                        throw new Error('登录信息已失效');
+                    }
+                    if (!response.ok) throw new Error(await this.responseError(response, '无法读取可编辑配置'));
+                    const data = await response.json();
+                    this.adminConfig = {
+                        feeds: Array.isArray(data.feeds) ? [...data.feeds] : [],
+                        keywords: Array.isArray(data.keywords) ? [...data.keywords] : [],
+                        refresh: data.refresh,
+                        autoUpdatePush: data.autoUpdatePush,
+                        listHeight: data.listHeight,
+                    };
+                    this.adminETag = response.headers.get('ETag') || '';
+                    this.editing = true;
+                } catch (error) {
+                    this.adminError = error.message || '无法读取可编辑配置';
+                }
+            },
+            cancelEditing() {
+                this.editing = false;
+                this.adminConfig = null;
+                this.adminETag = '';
+                this.saveError = '';
+            },
+            resetAdminView() {
+                this.loginVisible = false;
+                this.adminPassword = '';
+                this.loginError = '';
+                this.adminError = '';
+                this.settingsNotice = '';
+                this.cancelEditing();
+            },
+            addKeyword() {
+                this.adminConfig.keywords.push('');
+                this.$nextTick(() => this.focusLastEditorInput('.editor-section:nth-of-type(2) input'));
+            },
+            removeKeyword(index) {
+                this.adminConfig.keywords.splice(index, 1);
+            },
+            addFeed() {
+                this.adminConfig.feeds.push('');
+                this.$nextTick(() => this.focusLastEditorInput('.feed-editor-row input'));
+            },
+            removeFeed(index) {
+                this.adminConfig.feeds.splice(index, 1);
+            },
+            focusLastEditorInput(selector) {
+                const panel = document.querySelector('.settings-panel');
+                if (!panel) return;
+                const inputs = panel.querySelectorAll(selector);
+                if (inputs.length) inputs[inputs.length - 1].focus();
+            },
+            async saveAdminConfig() {
+                this.saveLoading = true;
+                this.saveError = '';
+                const payload = {
+                    feeds: this.adminConfig.feeds.map(value => value.trim()).filter(Boolean),
+                    keywords: this.adminConfig.keywords.map(value => value.trim()).filter(Boolean),
+                    refresh: Number(this.adminConfig.refresh),
+                    autoUpdatePush: Number(this.adminConfig.autoUpdatePush),
+                    listHeight: Number(this.adminConfig.listHeight),
+                };
+                try {
+                    const response = await fetch('/api/admin/config', {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': this.csrfToken,
+                            'If-Match': this.adminETag,
+                        },
+                        body: JSON.stringify(payload),
+                    });
+                    if (response.status === 401) {
+                        this.adminSession.authenticated = false;
+                        this.csrfToken = '';
+                        this.editing = false;
+                        this.loginVisible = true;
+                    }
+                    if (!response.ok) throw new Error(await this.responseError(response, '保存失败'));
+                    const saved = await response.json();
+                    this.adminETag = response.headers.get('ETag') || '';
+                    this.listHeight = saved.listHeight;
+                    this.autoUpdatePush = saved.autoUpdatePush;
+                    await this.refreshPublicConfig();
+                    this.cancelEditing();
+                    this.showNotice('设置已保存');
+                } catch (error) {
+                    this.saveError = error.message || '保存失败';
+                } finally {
+                    this.saveLoading = false;
+                }
+            },
+            async refreshPublicConfig() {
+                const response = await fetch('/api/config', { cache: 'no-store' });
+                if (!response.ok) throw new Error('无法刷新设置概览');
+                this.config = await response.json();
+            },
+            async responseError(response, fallback) {
+                try {
+                    const body = await response.json();
+                    return body.error || fallback;
+                } catch (_) {
+                    return fallback;
+                }
+            },
+            showNotice(message) {
+                window.clearTimeout(this.noticeTimer);
+                this.settingsNotice = message;
+                this.noticeTimer = window.setTimeout(() => { this.settingsNotice = ''; }, 3000);
             },
             connectWebSocket() {
                 const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -318,6 +587,7 @@
             document.removeEventListener('keydown', this.closeOnEscape);
             document.body.classList.remove('settings-open');
             window.clearTimeout(this.reconnectTimer);
+            window.clearTimeout(this.noticeTimer);
         },
     });
 

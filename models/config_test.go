@@ -111,3 +111,34 @@ func TestParseConfFileRejectsInvalidEnvironmentPort(t *testing.T) {
 		t.Fatal("ParseConfFile() error = nil, want invalid environment error")
 	}
 }
+
+func TestUpdateConfigFileWritesAtomically(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "config.json")
+	if err := os.WriteFile(path, []byte(`{"port":8080,"refresh":5}`), 0600); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+	config := Config{
+		Port:           9090,
+		ReFresh:        15,
+		AutoUpdatePush: 2,
+		ListHeight:     640,
+	}
+	if err := UpdateConfigFile(path, &config); err != nil {
+		t.Fatalf("UpdateConfigFile() error = %v", err)
+	}
+	saved, _, err := ReadConfigFile(path)
+	if err != nil {
+		t.Fatalf("ReadConfigFile() error = %v", err)
+	}
+	if saved.Port != 9090 || saved.ReFresh != 15 || saved.ListHeight != 640 {
+		t.Fatalf("saved config = %#v", saved)
+	}
+	matches, err := filepath.Glob(filepath.Join(directory, ".rss-reader-config-*"))
+	if err != nil {
+		t.Fatalf("filepath.Glob() error = %v", err)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("temporary config files remain: %#v", matches)
+	}
+}

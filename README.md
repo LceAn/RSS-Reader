@@ -22,6 +22,7 @@ RSS Reader 定时聚合多个 RSS、Atom 或 JSON Feed，在文章标题命中�
 - Vue 3 + WebSocket 实时界面，无 Node.js、打包器或外部 CDN 依赖。
 - `config.json` 热重载；新配置无效时继续使用上一份有效配置。
 - 配置接口自动隐藏 Token、Webhook、Chat ID 和订阅 URL 路径。
+- 单管理员登录后可在网页修改订阅源、关键词和刷新参数。
 - 支持环境变量注入密钥、健康检查、优雅退出和非 root Docker 部署。
 
 ## 快速开始
@@ -45,6 +46,22 @@ go run .
 ```
 
 启动后访问 [http://127.0.0.1:8080](http://127.0.0.1:8080)。先在 `config.json` 的 `values` 中加入订阅地址；修改订阅源、关键词、刷新周期或通知设置后，服务会自动重载。
+
+如需在网页中编辑设置，请在启动前配置至少 12 位的管理员密码：
+
+```bash
+export RSS_READER_ADMIN_PASSWORD='replace-with-a-strong-password'
+go run .
+```
+
+PowerShell：
+
+```powershell
+$env:RSS_READER_ADMIN_PASSWORD = 'replace-with-a-strong-password'
+go run .
+```
+
+未配置管理员密码时，设置抽屉保持只读。
 
 ## 配置说明
 
@@ -82,6 +99,8 @@ go run .
 | `RSS_READER_TELEGRAM_CHAT_ID` | Telegram Chat ID |
 | `RSS_READER_DINGTALK_WEBHOOK` | 钉钉 Webhook |
 | `RSS_READER_DINGTALK_SIGN` | 钉钉签名密钥 |
+| `RSS_READER_ADMIN_PASSWORD` | 网页管理密码，至少 12 位；留空时禁用编辑 |
+| `RSS_READER_ADMIN_PASSWORD_FILE` | 从文件读取网页管理密码，适合容器 Secret |
 
 PowerShell 示例：
 
@@ -107,10 +126,11 @@ go run .
 
 ```bash
 cp config.example.json config.json
+export RSS_READER_ADMIN_PASSWORD='replace-with-a-strong-password'
 docker compose up --build -d
 ```
 
-Compose 只把服务映射到宿主机的 `127.0.0.1:8080`。容器使用非 root 用户运行，配置以只读方式挂载，归档数据保存在 `rss-reader-data` 命名卷中。
+Compose 只把服务映射到宿主机的 `127.0.0.1:8080`。容器使用非 root 用户运行，本地 `config.json` 仅在命名卷首次创建时作为配置种子；网页保存后的配置和归档数据都保存在 `rss-reader-data` 卷中。
 
 ```bash
 docker compose logs -f
@@ -125,10 +145,15 @@ docker compose down
 | `GET /feeds` | 当前内存中的 Feed 数据 |
 | `GET /ws` | WebSocket 状态与内容推送 |
 | `GET /api/config` | 脱敏配置，仅展示订阅域名和通知渠道状态 |
+| `GET /api/auth/session` | 管理登录状态 |
+| `POST /api/auth/login` | 建立单管理员会话 |
+| `POST /api/auth/logout` | 注销管理会话 |
+| `GET /api/admin/config` | 登录后读取可编辑配置 |
+| `PUT /api/admin/config` | 登录后保存可编辑配置 |
 | `GET /healthz` | 进程存活检查 |
 | `GET /readyz` | 首轮抓取完成后的就绪检查 |
 
-所有接口均为只读；配置修改只通过本地配置文件或环境变量完成。
+管理接口只允许修改订阅源、关键词、抓取周期、前端推送周期和列表高度。通知密钥、监听地址、端口和归档路径不会发送到编辑器，也不能通过管理接口修改。
 
 ## 安全建议
 
@@ -137,6 +162,8 @@ docker compose down
 如果旧提交中曾包含 Token、Webhook、Chat ID 或带认证参数的订阅地址，仅添加 `.gitignore` 无法清除 Git 历史。请先轮换凭据，再根据需要清理历史记录。
 
 服务默认只监听回环地址。需要远程访问时，建议通过带 TLS 和身份验证的反向代理开放，不要直接监听公网网卡。
+
+管理会话保存在内存中，使用 `HttpOnly`、`SameSite=Strict` Cookie，并要求同源请求和 CSRF 令牌。登录失败会触发短期限速。管理员密码不会写入 `config.json`，也不要把它放进仓库中的 Compose 文件或 `.env` 示例。
 
 ## 开发与验证
 

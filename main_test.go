@@ -82,7 +82,7 @@ func TestSecurityHeaders(t *testing.T) {
 }
 
 func TestHealthAndReadyEndpoints(t *testing.T) {
-	handler := newHandler(context.Background())
+	handler := newHandler(context.Background(), nil)
 
 	healthRecorder := httptest.NewRecorder()
 	handler.ServeHTTP(healthRecorder, httptest.NewRequest(http.MethodGet, "/healthz", nil))

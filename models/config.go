@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -26,12 +27,8 @@ func ConfigPath() string {
 }
 
 func ParseConfFile(path string) (Config, error) {
-	var conf Config
-	data, err := os.ReadFile(path)
+	conf, _, err := ReadConfigFile(path)
 	if err != nil {
-		return conf, err
-	}
-	if err = json.Unmarshal(data, &conf); err != nil {
 		return conf, err
 	}
 	if err = conf.ApplyEnvironment(); err != nil {
@@ -42,6 +39,20 @@ func ParseConfFile(path string) (Config, error) {
 	}
 
 	return conf, nil
+}
+
+// ReadConfigFile decodes the file without applying environment overrides.
+// Admin updates use this form so environment-only secrets are never persisted.
+func ReadConfigFile(path string) (Config, []byte, error) {
+	var conf Config
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return conf, nil, err
+	}
+	if err := json.Unmarshal(data, &conf); err != nil {
+		return conf, nil, err
+	}
+	return conf, data, nil
 }
 
 // ApplyEnvironment keeps credentials out of config.json and makes container
@@ -219,9 +230,40 @@ func UpdateConfigFile(path string, newConfig *Config) error {
 	if err := config.Normalize(); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(&config, "", "    ")
+	return WriteConfigFileAtomic(path, &config)
+}
+
+// WriteConfigFileAtomic writes a complete JSON document through a temporary
+// file so readers never observe a partially-written configuration.
+func WriteConfigFileAtomic(path string, config *Config) error {
+	data, err := json.MarshalIndent(config, "", "    ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0600)
+	absolutePath, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	temp, err := os.CreateTemp(filepath.Dir(absolutePath), ".rss-reader-config-*")
+	if err != nil {
+		return err
+	}
+	tempPath := temp.Name()
+	defer os.Remove(tempPath)
+	if err := temp.Chmod(0600); err != nil {
+		temp.Close()
+		return err
+	}
+	if _, err := temp.Write(data); err != nil {
+		temp.Close()
+		return err
+	}
+	if err := temp.Sync(); err != nil {
+		temp.Close()
+		return err
+	}
+	if err := temp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tempPath, absolutePath)
 }

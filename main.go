@@ -31,6 +31,10 @@ func main() {
 func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	admin, err := newAdminServiceFromEnvironment()
+	if err != nil {
+		return fmt.Errorf("configure admin access: %w", err)
+	}
 
 	configPath := models.ConfigPath()
 	var background sync.WaitGroup
@@ -44,7 +48,7 @@ func run() error {
 		utils.WatchConfigFileChanges(ctx, configPath)
 	}()
 
-	mux := newHandler(ctx)
+	mux := newHandler(ctx, admin)
 	config := globals.GetConfig()
 	listenAddress := net.JoinHostPort(config.Host, strconv.Itoa(config.Port))
 	server := &http.Server{
@@ -87,7 +91,7 @@ func run() error {
 	return runError
 }
 
-func newHandler(ctx context.Context) *http.ServeMux {
+func newHandler(ctx context.Context, admin *adminService) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", tplHandler)
 	mux.Handle("/static/", http.FileServer(http.FS(globals.DirStatic)))
@@ -98,6 +102,10 @@ func newHandler(ctx context.Context) *http.ServeMux {
 	mux.HandleFunc("/api/config", configHandler)
 	mux.HandleFunc("/healthz", healthHandler)
 	mux.HandleFunc("/readyz", readyHandler)
+	if admin == nil {
+		admin, _ = newAdminService("")
+	}
+	admin.register(mux)
 	return mux
 }
 

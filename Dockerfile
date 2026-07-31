@@ -18,10 +18,12 @@ RUN apk add --no-cache ca-certificates tzdata \
 
 WORKDIR /app
 COPY --from=build --chown=rssreader:rssreader /out/rss-reader /app/rss-reader
-COPY --chown=rssreader:rssreader config.example.json /app/config.json
+COPY --chown=rssreader:rssreader config.example.json /app/config.example.json
+COPY --chown=rssreader:rssreader --chmod=755 docker-entrypoint.sh /app/docker-entrypoint.sh
 
 ENV RSS_READER_HOST=0.0.0.0 \
     RSS_READER_PORT=8080 \
+    RSS_READER_CONFIG=/app/data/config.json \
     RSS_READER_ARCHIVES=/app/data/archives.txt
 
 USER rssreader
@@ -31,4 +33,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD wget -q -O - "http://127.0.0.1:${RSS_READER_PORT}/healthz" >/dev/null || exit 1
 
-ENTRYPOINT ["/app/rss-reader"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
