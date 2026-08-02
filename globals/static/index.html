@@ -13,7 +13,7 @@
 </head>
 <body>
 <div id="app" v-cloak>
-    <div class="app-shell">
+    <div class="app-shell" :inert="showSettings">
         <header class="site-header">
             <div class="brand-block">
                 <span class="brand-mark" aria-hidden="true">
@@ -30,7 +30,7 @@
                 <div class="status-container" @mouseenter="showStatusPopup = true" @mouseleave="showStatusPopup = false">
                     <button class="icon-button status-button" type="button" aria-label="查看系统状态"
                             :aria-expanded="showStatusPopup" @click="showStatusPopup = !showStatusPopup"
-                            @focus="showStatusPopup = true" @blur="showStatusPopup = false">
+                            @blur="showStatusPopup = false">
                         <span class="status-indicator" :class="indicatorClass"></span>
                         <span class="button-label">运行状态</span>
                     </button>
@@ -134,10 +134,12 @@
     </div>
 
     <transition name="backdrop">
-        <button v-if="showSettings" class="settings-backdrop" type="button" aria-label="关闭设置" @click="toggleSettings"></button>
+        <button v-if="showSettings" class="settings-backdrop" type="button"
+                :aria-label="editing ? '返回设置' : '关闭设置'" tabindex="-1" @click="closeSettings"></button>
     </transition>
     <transition name="drawer">
-        <aside v-if="showSettings" class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <aside v-if="showSettings" class="settings-panel" role="dialog" aria-modal="true"
+               aria-labelledby="settings-title" :aria-busy="configLoading" tabindex="-1">
             <header class="settings-header">
                 <div class="settings-heading">
                     <h2 id="settings-title">{{ editing ? '编辑设置' : '设置' }}</h2>
@@ -145,13 +147,15 @@
                 </div>
                 <div class="settings-header-actions">
                     <button v-if="adminSession.enabled && !adminSession.authenticated" class="header-command" type="button"
-                            @click="loginVisible = !loginVisible">{{ loginVisible ? '取消' : '登录' }}</button>
+                            @click="toggleLogin">{{ loginVisible ? '取消' : '登录' }}</button>
                     <button v-if="adminSession.authenticated && !editing" class="header-command" type="button"
-                            @click="startEditing">编辑</button>
+                            @click="startEditing">{{ adminConfig && hasAdminChanges ? '继续编辑' : '编辑' }}</button>
                     <button v-if="adminSession.authenticated && !editing" class="header-command subtle" type="button"
                             @click="logout">退出</button>
-                    <button class="close-btn" type="button" aria-label="关闭设置" @click="toggleSettings">
-                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+                    <button class="close-btn" type="button" :aria-label="editing ? '返回设置' : '关闭设置'"
+                            @click="closeSettings">
+                        <svg v-if="editing" viewBox="0 0 20 20" aria-hidden="true"><path d="m11.5 5-5 5 5 5M7 10h7"/></svg>
+                        <svg v-else viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
                     </button>
                 </div>
             </header>
@@ -161,16 +165,16 @@
                     <label for="admin-password">管理员密码</label>
                     <div class="login-row">
                         <input id="admin-password" v-model="adminPassword" type="password" autocomplete="current-password"
-                               minlength="12" required autofocus>
+                               minlength="12" required>
                         <button class="primary-action" type="submit" :disabled="loginLoading">
                             {{ loginLoading ? '登录中' : '登录' }}
                         </button>
                     </div>
-                    <p class="form-message error" v-if="loginError">{{ loginError }}</p>
+                    <p class="form-message error" v-if="loginError" role="alert">{{ loginError }}</p>
                 </form>
 
-                <p class="form-message error" v-if="adminError">{{ adminError }}</p>
-                <p class="form-message success" v-if="settingsNotice">{{ settingsNotice }}</p>
+                <p class="form-message error" v-if="adminError" role="alert">{{ adminError }}</p>
+                <p class="form-message success" v-if="settingsNotice" role="status">{{ settingsNotice }}</p>
 
                 <template v-if="!editing">
                     <section class="settings-section">
@@ -262,10 +266,10 @@
                         </div>
                     </section>
 
-                    <p class="form-message error" v-if="saveError">{{ saveError }}</p>
+                    <p class="form-message error" v-if="saveError" role="alert">{{ saveError }}</p>
                     <div class="editor-actions">
                         <button class="secondary-action" type="button" :disabled="saveLoading" @click="cancelEditing">取消</button>
-                        <button class="primary-action" type="submit" :disabled="saveLoading">{{ saveLoading ? '保存中' : '保存' }}</button>
+                        <button class="primary-action" type="submit" :disabled="saveLoading || !hasAdminChanges">{{ saveLoading ? '保存中' : '保存' }}</button>
                     </div>
                 </form>
             </div>
@@ -324,6 +328,7 @@
                 adminError: '',
                 editing: false,
                 adminConfig: null,
+                adminOriginal: null,
                 adminETag: '',
                 saveLoading: false,
                 saveError: '',
@@ -337,6 +342,10 @@
                 if (!this.adminSession.enabled) return '只读';
                 if (this.adminSession.authenticated) return '管理员';
                 return '锁定';
+            },
+            hasAdminChanges() {
+                if (!this.adminConfig || !this.adminOriginal) return false;
+                return JSON.stringify(this.editablePayload(this.adminConfig)) !== JSON.stringify(this.adminOriginal);
             },
             indicatorClass() {
                 if (this.systemStatus.refreshing) return 'is-refreshing';
@@ -362,15 +371,42 @@
         },
         methods: {
             toggleSettings() {
-                this.showSettings = !this.showSettings;
                 if (this.showSettings) {
-                    this.loadSettings();
-                } else {
-                    this.resetAdminView();
+                    this.closeSettings();
+                    return;
                 }
+                this.showStatusPopup = false;
+                this.showSettings = true;
+                this.loadSettings();
+                this.$nextTick(() => this.focusSettingsPanel());
+            },
+            closeSettings() {
+                if (this.saveLoading) return;
+                if (this.editing) {
+                    this.leaveEditing();
+                    return;
+                }
+                this.showSettings = false;
+                this.resetAdminView();
+                this.$nextTick(() => document.querySelector('#settings-btn')?.focus());
+            },
+            focusSettingsPanel() {
+                const panel = document.querySelector('.settings-panel');
+                if (!panel) return;
+                const target = panel.querySelector('.header-command:not(:disabled), .close-btn');
+                (target || panel).focus();
             },
             closeOnEscape(event) {
-                if (event.key === 'Escape' && this.showSettings) this.toggleSettings();
+                if (event.key === 'Escape' && this.showSettings) this.closeSettings();
+            },
+            toggleLogin() {
+                this.loginVisible = !this.loginVisible;
+                this.loginError = '';
+                if (this.loginVisible) {
+                    this.$nextTick(() => document.querySelector('#admin-password')?.focus());
+                } else {
+                    this.adminPassword = '';
+                }
             },
             channelStatus(enabled) {
                 return enabled ? '已启用' : '未配置';
@@ -396,6 +432,7 @@
                     this.configError = '配置暂时无法读取，请稍后重试。';
                 } finally {
                     this.configLoading = false;
+                    if (this.showSettings) this.$nextTick(() => this.focusSettingsPanel());
                 }
             },
             async login() {
@@ -421,16 +458,22 @@
                 }
             },
             async logout() {
+                this.adminError = '';
                 try {
-                    await fetch('/api/auth/logout', {
+                    const response = await fetch('/api/auth/logout', {
                         method: 'POST',
                         headers: { 'X-CSRF-Token': this.csrfToken },
                     });
-                } finally {
-                    this.adminSession.authenticated = false;
-                    this.csrfToken = '';
-                    this.resetAdminView();
+                    if (!response.ok && response.status !== 401) {
+                        throw new Error(await this.responseError(response, '退出失败'));
+                    }
+                } catch (error) {
+                    this.adminError = error.message || '退出失败，请重试';
+                    return;
                 }
+                this.adminSession.authenticated = false;
+                this.csrfToken = '';
+                this.resetAdminView();
             },
             async startEditing() {
                 if (!this.adminSession.authenticated) {
@@ -440,6 +483,10 @@
                 this.saveError = '';
                 this.adminError = '';
                 this.settingsNotice = '';
+                if (this.adminConfig && this.adminOriginal && this.adminETag) {
+                    this.editing = true;
+                    return;
+                }
                 try {
                     const response = await fetch('/api/admin/config', { cache: 'no-store' });
                     if (response.status === 401) {
@@ -450,13 +497,15 @@
                     }
                     if (!response.ok) throw new Error(await this.responseError(response, '无法读取可编辑配置'));
                     const data = await response.json();
-                    this.adminConfig = {
+                    const editableConfig = {
                         feeds: Array.isArray(data.feeds) ? [...data.feeds] : [],
                         keywords: Array.isArray(data.keywords) ? [...data.keywords] : [],
                         refresh: data.refresh,
                         autoUpdatePush: data.autoUpdatePush,
                         listHeight: data.listHeight,
                     };
+                    this.adminConfig = editableConfig;
+                    this.adminOriginal = this.editablePayload(editableConfig);
                     this.adminETag = response.headers.get('ETag') || '';
                     this.editing = true;
                 } catch (error) {
@@ -464,9 +513,13 @@
                 }
             },
             cancelEditing() {
-                this.editing = false;
+                this.leaveEditing();
                 this.adminConfig = null;
+                this.adminOriginal = null;
                 this.adminETag = '';
+            },
+            leaveEditing() {
+                this.editing = false;
                 this.saveError = '';
             },
             resetAdminView() {
@@ -497,16 +550,20 @@
                 const inputs = panel.querySelectorAll(selector);
                 if (inputs.length) inputs[inputs.length - 1].focus();
             },
+            editablePayload(config) {
+                return {
+                    feeds: config.feeds.map(value => String(value).trim()).filter(Boolean),
+                    keywords: config.keywords.map(value => String(value).trim()).filter(Boolean),
+                    refresh: Number(config.refresh),
+                    autoUpdatePush: Number(config.autoUpdatePush),
+                    listHeight: Number(config.listHeight),
+                };
+            },
             async saveAdminConfig() {
+                if (!this.hasAdminChanges) return;
                 this.saveLoading = true;
                 this.saveError = '';
-                const payload = {
-                    feeds: this.adminConfig.feeds.map(value => value.trim()).filter(Boolean),
-                    keywords: this.adminConfig.keywords.map(value => value.trim()).filter(Boolean),
-                    refresh: Number(this.adminConfig.refresh),
-                    autoUpdatePush: Number(this.adminConfig.autoUpdatePush),
-                    listHeight: Number(this.adminConfig.listHeight),
-                };
+                const payload = this.editablePayload(this.adminConfig);
                 try {
                     const response = await fetch('/api/admin/config', {
                         method: 'PUT',

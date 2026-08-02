@@ -460,6 +460,7 @@ a:focus-visible {
     border-left: 1px solid var(--border);
     background: var(--surface);
     box-shadow: -12px 0 36px rgba(0, 0, 0, 0.12);
+    outline: 0;
 }
 
 .settings-header {
@@ -545,6 +546,7 @@ a:focus-visible {
     stroke: currentColor;
     stroke-width: 1.8;
     stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .settings-content {
@@ -628,7 +630,7 @@ a:focus-visible {
 .primary-action:disabled,
 .secondary-action:disabled {
     opacity: 0.5;
-    cursor: wait;
+    cursor: not-allowed;
 }
 
 .form-message {
