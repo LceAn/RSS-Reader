@@ -287,7 +287,7 @@ a:focus-visible {
 
 .feed-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(23rem, 100%), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(23rem, 100%), 1fr));
     align-items: start;
     gap: 16px;
 }
@@ -556,10 +556,16 @@ a:focus-visible {
     padding: 0 22px 24px;
 }
 
-.settings-editor {
-    min-height: 100%;
+.settings-content.is-editing {
     display: flex;
     flex-direction: column;
+    padding-bottom: 0;
+}
+
+.settings-editor {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
 }
 
 .admin-login {
@@ -768,7 +774,7 @@ a:focus-visible {
 
 .editor-actions {
     position: sticky;
-    bottom: -24px;
+    bottom: 0;
     z-index: 2;
     margin: auto -22px 0;
     padding: 14px 22px 16px;

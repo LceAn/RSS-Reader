@@ -30,7 +30,7 @@
                 <div class="status-container" @mouseenter="showStatusPopup = true" @mouseleave="showStatusPopup = false">
                     <button class="icon-button status-button" type="button" aria-label="查看系统状态"
                             :aria-expanded="showStatusPopup" @click="showStatusPopup = !showStatusPopup"
-                            @blur="showStatusPopup = false">
+                            @blur="showStatusPopup = false" @keydown.esc="showStatusPopup = false">
                         <span class="status-indicator" :class="indicatorClass"></span>
                         <span class="button-label">运行状态</span>
                     </button>
@@ -160,7 +160,7 @@
                 </div>
             </header>
 
-            <div class="settings-content" v-if="!configLoading && !configError">
+            <div class="settings-content" :class="{ 'is-editing': editing }" v-if="!configLoading && !configError">
                 <form v-if="loginVisible && !adminSession.authenticated" class="admin-login" @submit.prevent="login">
                     <label for="admin-password">管理员密码</label>
                     <div class="login-row">
