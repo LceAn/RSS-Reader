@@ -86,7 +86,7 @@ go run .
 | `values` | string[] | RSS、Atom 或 JSON Feed 地址 |
 | `refresh` | number | 后端抓取周期，单位为分钟，必须大于 `0` |
 | `autoUpdatePush` | number | 页面内容检查周期，单位为分钟；`0` 表示关闭后续推送 |
-| `listHeight` | number | 阅读页中每个订阅列表的高度，单位为像素 |
+| `listHeight` | number | 阅读页中每个订阅列表的高度，范围 `240-1600px`；窄屏自动限制为视口高度的 `62%` |
 | `keywords` | string[] | 文章标题监听关键词，命中任意一个即进入通知流程 |
 | `notify` | object | Telegram、飞书和钉钉通知配置 |
 | `archives` | string | 已成功通知链接的本地归档路径 |

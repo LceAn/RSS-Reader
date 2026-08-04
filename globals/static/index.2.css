@@ -157,6 +157,11 @@ a:focus-visible {
     background: var(--surface-hover);
 }
 
+.status-button[aria-expanded="true"] {
+    color: var(--text);
+    background: var(--surface-hover);
+}
+
 .icon-button > svg {
     width: 17px;
     height: 17px;
@@ -348,7 +353,7 @@ a:focus-visible {
 }
 
 .feed-scroll {
-    height: clamp(22rem, var(--list-height, 34rem), 38rem);
+    height: clamp(15rem, var(--list-height, 34rem), 100rem);
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -397,6 +402,10 @@ a:focus-visible {
     background: var(--surface-hover);
 }
 
+.feed-items a:focus-visible {
+    outline-offset: -3px;
+}
+
 .feed-items a:visited {
     color: var(--muted);
 }
@@ -414,6 +423,7 @@ a:focus-visible {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 16px;
     border-top: 1px solid var(--border);
     color: var(--faint);
@@ -424,12 +434,14 @@ a:focus-visible {
 .site-footer nav {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 14px;
 }
 
 .site-footer a {
     color: var(--muted);
     text-decoration: none;
+    overflow-wrap: anywhere;
 }
 
 .site-footer a:hover {
@@ -1016,13 +1028,7 @@ a:focus-visible {
     }
 
     .feed-scroll {
-        height: min(var(--list-height, 32rem), 62vh);
-        min-height: 21rem;
-    }
-
-    .site-footer {
-        align-items: flex-start;
-        flex-direction: column;
+        height: min(clamp(15rem, var(--list-height, 32rem), 100rem), 62vh);
     }
 
     .settings-panel {
