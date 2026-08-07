@@ -244,6 +244,106 @@
                         </div>
                     </section>
 
+                    <section class="settings-section editor-section notification-editor-section">
+                        <div class="settings-section-title"><h3>通知渠道</h3></div>
+                        <div class="notification-editors">
+                            <div class="channel-editor">
+                                <div class="channel-heading">
+                                    <div class="channel-name">
+                                        <strong>Telegram</strong>
+                                        <span :class="{ enabled: adminConfig.notify.telegram.enabled && notificationReady('telegram'), warning: !notificationReady('telegram') && (adminConfig.notify.telegram.enabled || hasNotificationCredentials(adminConfig.notify.telegram)) }">
+                                            {{ notificationStatus('telegram') }}
+                                        </span>
+                                    </div>
+                                    <label class="switch-control" :class="{ disabled: notificationToggleLocked('telegram') }">
+                                        <input v-model="adminConfig.notify.telegram.enabled" type="checkbox"
+                                               :disabled="notificationToggleLocked('telegram')" aria-label="启用 Telegram">
+                                        <span aria-hidden="true"></span>
+                                    </label>
+                                </div>
+                                <div class="channel-fields" v-if="adminConfig.notify.telegram.enabled">
+                                    <label class="credential-field">
+                                        <span class="credential-label">API 地址 <em v-if="adminConfig.notify.telegram.apiManaged">环境变量</em></span>
+                                        <input v-model="adminConfig.notify.telegram.api" type="url" maxlength="4096" autocomplete="off"
+                                               :disabled="adminConfig.notify.telegram.apiManaged"
+                                               :required="!adminConfig.notify.telegram.apiConfigured && !adminConfig.notify.telegram.apiManaged"
+                                               :placeholder="credentialPlaceholder(adminConfig.notify.telegram.apiConfigured, adminConfig.notify.telegram.apiManaged, 'https://api.telegram.org/bot${token}/sendMessage')">
+                                    </label>
+                                    <label class="credential-field">
+                                        <span class="credential-label">Token <em v-if="adminConfig.notify.telegram.tokenManaged">环境变量</em></span>
+                                        <input v-model="adminConfig.notify.telegram.token" type="password" maxlength="4096" autocomplete="new-password"
+                                               :disabled="adminConfig.notify.telegram.tokenManaged"
+                                               :required="!adminConfig.notify.telegram.tokenConfigured && !adminConfig.notify.telegram.tokenManaged"
+                                               :placeholder="credentialPlaceholder(adminConfig.notify.telegram.tokenConfigured, adminConfig.notify.telegram.tokenManaged, 'Bot Token')">
+                                    </label>
+                                    <label class="credential-field">
+                                        <span class="credential-label">Chat ID <em v-if="adminConfig.notify.telegram.chatIdManaged">环境变量</em></span>
+                                        <input v-model="adminConfig.notify.telegram.chatId" type="password" maxlength="4096" autocomplete="new-password"
+                                               :disabled="adminConfig.notify.telegram.chatIdManaged"
+                                               :required="!adminConfig.notify.telegram.chatIdConfigured && !adminConfig.notify.telegram.chatIdManaged"
+                                               :placeholder="credentialPlaceholder(adminConfig.notify.telegram.chatIdConfigured, adminConfig.notify.telegram.chatIdManaged, 'Chat ID')">
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="channel-editor">
+                                <div class="channel-heading">
+                                    <div class="channel-name">
+                                        <strong>飞书</strong>
+                                        <span :class="{ enabled: adminConfig.notify.feishu.enabled && notificationReady('feishu'), warning: !notificationReady('feishu') && (adminConfig.notify.feishu.enabled || hasNotificationCredentials(adminConfig.notify.feishu)) }">
+                                            {{ notificationStatus('feishu') }}
+                                        </span>
+                                    </div>
+                                    <label class="switch-control" :class="{ disabled: notificationToggleLocked('feishu') }">
+                                        <input v-model="adminConfig.notify.feishu.enabled" type="checkbox"
+                                               :disabled="notificationToggleLocked('feishu')" aria-label="启用飞书">
+                                        <span aria-hidden="true"></span>
+                                    </label>
+                                </div>
+                                <div class="channel-fields" v-if="adminConfig.notify.feishu.enabled">
+                                    <label class="credential-field">
+                                        <span class="credential-label">Webhook <em v-if="adminConfig.notify.feishu.webhookManaged">环境变量</em></span>
+                                        <input v-model="adminConfig.notify.feishu.webhook" type="password" maxlength="4096" autocomplete="new-password"
+                                               :disabled="adminConfig.notify.feishu.webhookManaged"
+                                               :required="!adminConfig.notify.feishu.webhookConfigured && !adminConfig.notify.feishu.webhookManaged"
+                                               :placeholder="credentialPlaceholder(adminConfig.notify.feishu.webhookConfigured, adminConfig.notify.feishu.webhookManaged, 'Webhook URL')">
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="channel-editor">
+                                <div class="channel-heading">
+                                    <div class="channel-name">
+                                        <strong>钉钉</strong>
+                                        <span :class="{ enabled: adminConfig.notify.dingtalk.enabled && notificationReady('dingtalk'), warning: !notificationReady('dingtalk') && (adminConfig.notify.dingtalk.enabled || hasNotificationCredentials(adminConfig.notify.dingtalk)) }">
+                                            {{ notificationStatus('dingtalk') }}
+                                        </span>
+                                    </div>
+                                    <label class="switch-control" :class="{ disabled: notificationToggleLocked('dingtalk') }">
+                                        <input v-model="adminConfig.notify.dingtalk.enabled" type="checkbox"
+                                               :disabled="notificationToggleLocked('dingtalk')" aria-label="启用钉钉">
+                                        <span aria-hidden="true"></span>
+                                    </label>
+                                </div>
+                                <div class="channel-fields" v-if="adminConfig.notify.dingtalk.enabled">
+                                    <label class="credential-field">
+                                        <span class="credential-label">Webhook <em v-if="adminConfig.notify.dingtalk.webhookManaged">环境变量</em></span>
+                                        <input v-model="adminConfig.notify.dingtalk.webhook" type="password" maxlength="4096" autocomplete="new-password"
+                                               :disabled="adminConfig.notify.dingtalk.webhookManaged"
+                                               :required="!adminConfig.notify.dingtalk.webhookConfigured && !adminConfig.notify.dingtalk.webhookManaged"
+                                               :placeholder="credentialPlaceholder(adminConfig.notify.dingtalk.webhookConfigured, adminConfig.notify.dingtalk.webhookManaged, 'Webhook URL')">
+                                    </label>
+                                    <label class="credential-field">
+                                        <span class="credential-label">签名密钥 <em v-if="adminConfig.notify.dingtalk.signManaged">环境变量</em></span>
+                                        <input v-model="adminConfig.notify.dingtalk.sign" type="password" maxlength="4096" autocomplete="new-password"
+                                               :disabled="adminConfig.notify.dingtalk.signManaged"
+                                               :placeholder="credentialPlaceholder(adminConfig.notify.dingtalk.signConfigured, adminConfig.notify.dingtalk.signManaged, '可选')">
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
                     <section class="settings-section editor-section">
                         <div class="settings-section-title"><h3>监听关键词 <span>{{ adminConfig.keywords.length }}</span></h3></div>
                         <div class="editor-rows">
@@ -503,6 +603,7 @@
                         refresh: data.refresh,
                         autoUpdatePush: data.autoUpdatePush,
                         listHeight: data.listHeight,
+                        notify: this.normalizeNotificationConfig(data.notify),
                     };
                     this.adminConfig = editableConfig;
                     this.adminOriginal = this.editablePayload(editableConfig);
@@ -550,6 +651,73 @@
                 const inputs = panel.querySelectorAll(selector);
                 if (inputs.length) inputs[inputs.length - 1].focus();
             },
+            normalizeNotificationConfig(notify) {
+                const feishu = notify && notify.feishu ? notify.feishu : {};
+                const telegram = notify && notify.telegram ? notify.telegram : {};
+                const dingtalk = notify && notify.dingtalk ? notify.dingtalk : {};
+                return {
+                    feishu: {
+                        enabled: Boolean(feishu.enabled),
+                        webhook: '',
+                        webhookConfigured: Boolean(feishu.webhookConfigured),
+                        webhookManaged: Boolean(feishu.webhookManaged),
+                    },
+                    telegram: {
+                        enabled: Boolean(telegram.enabled),
+                        api: '',
+                        token: '',
+                        chatId: '',
+                        apiConfigured: Boolean(telegram.apiConfigured),
+                        tokenConfigured: Boolean(telegram.tokenConfigured),
+                        chatIdConfigured: Boolean(telegram.chatIdConfigured),
+                        apiManaged: Boolean(telegram.apiManaged),
+                        tokenManaged: Boolean(telegram.tokenManaged),
+                        chatIdManaged: Boolean(telegram.chatIdManaged),
+                    },
+                    dingtalk: {
+                        enabled: Boolean(dingtalk.enabled),
+                        webhook: '',
+                        sign: '',
+                        webhookConfigured: Boolean(dingtalk.webhookConfigured),
+                        signConfigured: Boolean(dingtalk.signConfigured),
+                        webhookManaged: Boolean(dingtalk.webhookManaged),
+                        signManaged: Boolean(dingtalk.signManaged),
+                    },
+                };
+            },
+            hasNotificationCredentials(channel) {
+                return Object.entries(channel).some(([key, value]) => key.endsWith('Configured') && value);
+            },
+            hasUnavailableManagedCredential(channel) {
+                return Object.entries(channel).some(([key, value]) => {
+                    if (!key.endsWith('Managed') || !value) return false;
+                    return !channel[`${key.slice(0, -7)}Configured`];
+                });
+            },
+            notificationReady(channelName) {
+                const channel = this.adminConfig.notify[channelName];
+                const available = (field) => channel[`${field}Configured`] || String(channel[field] || '').trim() !== '';
+                if (channelName === 'feishu' || channelName === 'dingtalk') return available('webhook');
+                return available('api') && available('token') && available('chatId');
+            },
+            notificationStatus(channelName) {
+                const channel = this.adminConfig.notify[channelName];
+                if (channel.enabled) return this.notificationReady(channelName) ? '已启用' : '待填写';
+                if (this.hasUnavailableManagedCredential(channel)) return '环境变量未设置';
+                return this.hasNotificationCredentials(channel) ? '待补全' : '未配置';
+            },
+            notificationToggleLocked(channelName) {
+                const channel = this.adminConfig.notify[channelName];
+                if (channelName === 'feishu' || channelName === 'dingtalk') {
+                    return channel.webhookManaged;
+                }
+                if (!channel.enabled) return this.hasUnavailableManagedCredential(channel);
+                return channel.apiManaged && channel.tokenManaged && channel.chatIdManaged;
+            },
+            credentialPlaceholder(configured, managed, fallback) {
+                if (managed) return '由环境变量提供';
+                return configured ? '已配置，留空保留' : fallback;
+            },
             editablePayload(config) {
                 return {
                     feeds: config.feeds.map(value => String(value).trim()).filter(Boolean),
@@ -557,6 +725,23 @@
                     refresh: Number(config.refresh),
                     autoUpdatePush: Number(config.autoUpdatePush),
                     listHeight: Number(config.listHeight),
+                    notify: {
+                        feishu: {
+                            enabled: Boolean(config.notify.feishu.enabled),
+                            webhook: config.notify.feishu.enabled ? String(config.notify.feishu.webhook).trim() : '',
+                        },
+                        telegram: {
+                            enabled: Boolean(config.notify.telegram.enabled),
+                            api: config.notify.telegram.enabled ? String(config.notify.telegram.api).trim() : '',
+                            token: config.notify.telegram.enabled ? String(config.notify.telegram.token).trim() : '',
+                            chatId: config.notify.telegram.enabled ? String(config.notify.telegram.chatId).trim() : '',
+                        },
+                        dingtalk: {
+                            enabled: Boolean(config.notify.dingtalk.enabled),
+                            webhook: config.notify.dingtalk.enabled ? String(config.notify.dingtalk.webhook).trim() : '',
+                            sign: config.notify.dingtalk.enabled ? String(config.notify.dingtalk.sign).trim() : '',
+                        },
+                    },
                 };
             },
             async saveAdminConfig() {

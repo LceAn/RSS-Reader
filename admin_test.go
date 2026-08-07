@@ -104,6 +104,16 @@ func TestAdminConfigUpdatePreservesEnvironmentSecrets(t *testing.T) {
 	if getRecorder.Code != http.StatusOK {
 		t.Fatalf("GET admin config status = %d, body=%s", getRecorder.Code, getRecorder.Body.String())
 	}
+	if bytes.Contains(getRecorder.Body.Bytes(), []byte("environment-only-token")) {
+		t.Fatal("GET admin config exposed an environment-managed token")
+	}
+	var visibleConfig editableConfig
+	if err := json.Unmarshal(getRecorder.Body.Bytes(), &visibleConfig); err != nil {
+		t.Fatalf("decode editable config: %v", err)
+	}
+	if visibleConfig.Notify == nil || !visibleConfig.Notify.Telegram.TokenConfigured || !visibleConfig.Notify.Telegram.TokenManaged {
+		t.Fatalf("Telegram credential status = %#v", visibleConfig.Notify)
+	}
 	etag := getRecorder.Header().Get("ETag")
 	if etag == "" {
 		t.Fatal("GET admin config did not return ETag")
@@ -139,6 +149,9 @@ func TestAdminConfigUpdatePreservesEnvironmentSecrets(t *testing.T) {
 	if bytes.Contains(data, []byte("environment-only-token")) || fileConfig.Notify.Telegram.Token != "" {
 		t.Fatal("environment-only Telegram token was persisted")
 	}
+	if fileConfig.Notify.Telegram.API != "https://api.telegram.org/bot${token}/sendMessage" {
+		t.Fatal("legacy update without notify changed the Telegram API")
+	}
 	if fileConfig.ReFresh != 10 || fileConfig.ListHeight != 720 || len(fileConfig.Values) != 1 {
 		t.Fatalf("saved file config = %#v", fileConfig)
 	}
@@ -156,6 +169,108 @@ func TestAdminConfigUpdatePreservesEnvironmentSecrets(t *testing.T) {
 	service.adminConfigHandler(staleRecorder, staleRequest)
 	if staleRecorder.Code != http.StatusPreconditionFailed {
 		t.Fatalf("stale update status = %d, want 412", staleRecorder.Code)
+	}
+
+	managedUpdate, managedETag, _ := getEditableConfigForTest(t, service, cookie)
+	managedUpdate.Notify.Telegram.Enabled = true
+	managedUpdate.Notify.Telegram.Token = "browser-token"
+	managedRecorder := putEditableConfigForTest(t, service, cookie, csrf, managedETag, managedUpdate)
+	if managedRecorder.Code != http.StatusBadRequest {
+		t.Fatalf("environment-managed update status = %d, want 400; body=%s", managedRecorder.Code, managedRecorder.Body.String())
+	}
+	fileConfig, data, err = models.ReadConfigFile(path)
+	if err != nil {
+		t.Fatalf("ReadConfigFile() after rejected update error = %v", err)
+	}
+	if bytes.Contains(data, []byte("browser-token")) || fileConfig.Notify.Telegram.Token != "" {
+		t.Fatal("environment-managed Telegram token was overwritten")
+	}
+}
+
+func TestAdminConfigNotificationSecretsAndUpdates(t *testing.T) {
+	path := writeAdminTestConfig(t)
+	fileConfig, _, err := models.ReadConfigFile(path)
+	if err != nil {
+		t.Fatalf("ReadConfigFile() error = %v", err)
+	}
+	fileConfig.Notify.FeiShu.API = "https://open.feishu.cn/open-apis/bot/v2/hook/private-feishu"
+	fileConfig.Notify.Telegram.API = "https://api.telegram.org/bot${token}/sendMessage"
+	fileConfig.Notify.Telegram.Token = "private-telegram-token"
+	fileConfig.Notify.Telegram.ChatId = "private-chat-id"
+	fileConfig.Notify.Dingtalk.Webhook = "https://oapi.dingtalk.com/robot/send?access_token=private-dingtalk"
+	fileConfig.Notify.Dingtalk.Sign = "private-dingtalk-sign"
+	if err := models.WriteConfigFileAtomic(path, &fileConfig); err != nil {
+		t.Fatalf("WriteConfigFileAtomic() error = %v", err)
+	}
+	t.Setenv("RSS_READER_CONFIG", path)
+	if err := globals.ReloadConfig(); err != nil {
+		t.Fatalf("ReloadConfig() error = %v", err)
+	}
+
+	service, err := newAdminService(testAdminPassword)
+	if err != nil {
+		t.Fatalf("newAdminService() error = %v", err)
+	}
+	cookie, csrf := loginForTest(t, service)
+
+	current, etag, responseBody := getEditableConfigForTest(t, service, cookie)
+	for _, secret := range []string{
+		"private-feishu",
+		"private-telegram-token",
+		"private-chat-id",
+		"private-dingtalk",
+		"private-dingtalk-sign",
+	} {
+		if bytes.Contains(responseBody, []byte(secret)) {
+			t.Fatalf("GET admin config exposed %q", secret)
+		}
+	}
+	if current.Notify == nil || !current.Notify.FeiShu.Enabled || !current.Notify.Telegram.Enabled || !current.Notify.Dingtalk.Enabled {
+		t.Fatalf("notification status = %#v", current.Notify)
+	}
+
+	keepRecorder := putEditableConfigForTest(t, service, cookie, csrf, etag, current)
+	if keepRecorder.Code != http.StatusOK {
+		t.Fatalf("blank credential update status = %d, body=%s", keepRecorder.Code, keepRecorder.Body.String())
+	}
+	assertStoredNotificationSecrets(t, path,
+		"https://open.feishu.cn/open-apis/bot/v2/hook/private-feishu",
+		"private-telegram-token",
+		"private-chat-id",
+		"https://oapi.dingtalk.com/robot/send?access_token=private-dingtalk",
+		"private-dingtalk-sign",
+	)
+
+	replacement, replacementETag, _ := getEditableConfigForTest(t, service, cookie)
+	replacement.Notify.FeiShu.Webhook = "https://open.feishu.cn/open-apis/bot/v2/hook/replacement"
+	replacement.Notify.Telegram.Token = "replacement-token"
+	replacement.Notify.Dingtalk.Sign = "replacement-sign"
+	replaceRecorder := putEditableConfigForTest(t, service, cookie, csrf, replacementETag, replacement)
+	if replaceRecorder.Code != http.StatusOK {
+		t.Fatalf("credential replacement status = %d, body=%s", replaceRecorder.Code, replaceRecorder.Body.String())
+	}
+	assertStoredNotificationSecrets(t, path,
+		"https://open.feishu.cn/open-apis/bot/v2/hook/replacement",
+		"replacement-token",
+		"private-chat-id",
+		"https://oapi.dingtalk.com/robot/send?access_token=private-dingtalk",
+		"replacement-sign",
+	)
+
+	disabled, disabledETag, _ := getEditableConfigForTest(t, service, cookie)
+	disabled.Notify.FeiShu.Enabled = false
+	disabled.Notify.Telegram.Enabled = false
+	disabled.Notify.Dingtalk.Enabled = false
+	disableRecorder := putEditableConfigForTest(t, service, cookie, csrf, disabledETag, disabled)
+	if disableRecorder.Code != http.StatusOK {
+		t.Fatalf("notification disable status = %d, body=%s", disableRecorder.Code, disableRecorder.Body.String())
+	}
+	stored, _, err := models.ReadConfigFile(path)
+	if err != nil {
+		t.Fatalf("ReadConfigFile() after disable error = %v", err)
+	}
+	if stored.Notify != (models.Notify{}) {
+		t.Fatalf("disabled notification config = %#v, want empty", stored.Notify)
 	}
 }
 
@@ -198,6 +313,54 @@ func loginForTest(t *testing.T, service *adminService) (*http.Cookie, string) {
 		t.Fatalf("decode login response: %v", err)
 	}
 	return cookies[0], state.CSRFToken
+}
+
+func getEditableConfigForTest(t *testing.T, service *adminService, cookie *http.Cookie) (editableConfig, string, []byte) {
+	t.Helper()
+	request := httptest.NewRequest(http.MethodGet, "/api/admin/config", nil)
+	request.AddCookie(cookie)
+	recorder := httptest.NewRecorder()
+	service.adminConfigHandler(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET admin config status = %d, body=%s", recorder.Code, recorder.Body.String())
+	}
+	var config editableConfig
+	if err := json.Unmarshal(recorder.Body.Bytes(), &config); err != nil {
+		t.Fatalf("decode admin config: %v", err)
+	}
+	return config, recorder.Header().Get("ETag"), append([]byte(nil), recorder.Body.Bytes()...)
+}
+
+func putEditableConfigForTest(t *testing.T, service *adminService, cookie *http.Cookie, csrf, etag string, update editableConfig) *httptest.ResponseRecorder {
+	t.Helper()
+	body, err := json.Marshal(update)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	request := httptest.NewRequest(http.MethodPut, "/api/admin/config", bytes.NewReader(body))
+	request.Host = "example.com"
+	request.Header.Set("Origin", "http://example.com")
+	request.Header.Set("X-CSRF-Token", csrf)
+	request.Header.Set("If-Match", etag)
+	request.AddCookie(cookie)
+	recorder := httptest.NewRecorder()
+	service.adminConfigHandler(recorder, request)
+	return recorder
+}
+
+func assertStoredNotificationSecrets(t *testing.T, path, feishu, telegramToken, telegramChatID, dingtalkWebhook, dingtalkSign string) {
+	t.Helper()
+	config, _, err := models.ReadConfigFile(path)
+	if err != nil {
+		t.Fatalf("ReadConfigFile() error = %v", err)
+	}
+	if config.Notify.FeiShu.API != feishu ||
+		config.Notify.Telegram.Token != telegramToken ||
+		config.Notify.Telegram.ChatId != telegramChatID ||
+		config.Notify.Dingtalk.Webhook != dingtalkWebhook ||
+		config.Notify.Dingtalk.Sign != dingtalkSign {
+		t.Fatalf("stored notification secrets = %#v", config.Notify)
+	}
 }
 
 func loginRequest(body string) *http.Request {
