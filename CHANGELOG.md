@@ -2,6 +2,11 @@
 
 本文件记录 RSS Reader 的重要变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [未发布] - 2026-08-31
+
+### 安全
+- Go 工具链从 1.25.12 升级到 1.25.13，修复标准库漏洞 GO-2026-6218（net/url）、GO-2026-6091（html/template）、GO-2026-6090（crypto/tls）、GO-2026-6089（net/http）；govulncheck CI 恢复绿色。
+
 ## [未发布] - 2026-08-30
 
 ### 新增
