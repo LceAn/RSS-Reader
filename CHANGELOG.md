@@ -3,6 +3,10 @@
 本文件记录 RSS Reader 的重要变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
 ## [未发布] - 2026-08-31
+### 新增
+- 管理端新增 OPML 2.0 导入/导出接口（`GET/POST /api/admin/opml`）：导出当前订阅（标题优先取已抓取的 Feed 标题）；导入支持分组嵌套 outline、自动去重、非 http(s) 链接跳过、遵守订阅上限，并复用配置编辑的事务保存与回滚流程。配套 3 个测试函数覆盖导出、导入去重、鉴权/CSRF/版本冲突路径。
+
+
 
 ### 安全
 - Go 工具链从 1.25.12 升级到 1.25.13，修复标准库漏洞 GO-2026-6218（net/url）、GO-2026-6091（html/template）、GO-2026-6090（crypto/tls）、GO-2026-6089（net/http）；govulncheck CI 恢复绿色。

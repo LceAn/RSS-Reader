@@ -93,6 +93,7 @@ func (service *adminService) register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/auth/login", service.loginHandler)
 	mux.HandleFunc("/api/auth/logout", service.logoutHandler)
 	mux.HandleFunc("/api/admin/config", service.adminConfigHandler)
+	mux.HandleFunc("/api/admin/opml", service.adminOPMLHandler)
 }
 
 func (service *adminService) sessionHandler(w http.ResponseWriter, r *http.Request) {

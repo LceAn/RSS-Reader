@@ -13,6 +13,18 @@
 
 RSS Reader 定时聚合多个 RSS、Atom 或 JSON Feed，在文章标题命中监听关键词后，通过 Telegram、飞书或钉钉发送通知。服务同时提供简洁的响应式阅读页面，实时展示内容、抓取状态和经过脱敏的运行配置。
 
+## 订阅迁移（OPML）
+
+管理员接口支持 OPML 2.0 导入/导出，便于在多个 RSS 服务之间迁移订阅：
+
+- **导出**：`GET /api/admin/opml`（需管理员会话），返回当前全部订阅的 OPML 2.0 文件；标题优先使用已抓取的 Feed 标题。
+- **导入**：`POST /api/admin/opml`，需登录会话、CSRF 令牌与 `If-Match` 配置版本（与配置编辑同一套并发保护）。解析所有带 `xmlUrl` 的 outline（含分组嵌套），自动去重并跳过非 http(s) 链接，遵守 200 个订阅的上限；成功后立即触发一次刷新。
+- 命令行导入示例：
+
+```bash
+curl -b cookies.txt -H "X-CSRF-Token: $CSRF" -H "If-Match: $ETAG"   --data-binary @subscriptions.opml http://127.0.0.1:8080/api/admin/opml
+```
+
 ## 核心能力
 
 - 并发抓取多个订阅源，同一时刻只运行一轮刷新任务。
