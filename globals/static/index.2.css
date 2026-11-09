@@ -192,6 +192,10 @@ a:focus-visible {
     background: var(--accent);
 }
 
+.status-indicator.is-offline {
+    background: var(--faint);
+}
+
 .status-popup {
     position: absolute;
     top: calc(100% + 8px);
@@ -231,6 +235,10 @@ a:focus-visible {
 
 .status-copy.is-refreshing {
     color: var(--accent);
+}
+
+.status-copy.is-offline {
+    color: var(--faint);
 }
 
 .status-grid {

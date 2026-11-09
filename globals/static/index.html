@@ -49,6 +49,10 @@
                                 <div><dt>任务</dt><dd>{{ systemStatus.refreshing ? '刷新中' : '空闲' }}</dd></div>
                             </dl>
                             <div class="countdown-row">
+                                <span>上次刷新</span>
+                                <strong>{{ lastRefreshLabel }}</strong>
+                            </div>
+                            <div class="countdown-row">
                                 <span>下次刷新</span>
                                 <strong>{{ formattedCountdown }}</strong>
                             </div>
@@ -442,6 +446,9 @@
                 settingsNotice: '',
                 reconnectTimer: null,
                 noticeTimer: null,
+                wsSocket: null,
+                wsRetry: 0,
+                wsConnected: false,
             };
         },
         computed: {
@@ -455,14 +462,23 @@
                 return JSON.stringify(this.editablePayload(this.adminConfig)) !== JSON.stringify(this.adminOriginal);
             },
             indicatorClass() {
+                if (!this.wsConnected) return 'is-offline';
                 if (this.systemStatus.refreshing) return 'is-refreshing';
                 if (this.systemStatus.failed > 0) return 'is-warning';
                 return 'is-healthy';
             },
             statusLabel() {
+                if (!this.wsConnected) return '连接断开';
                 if (this.systemStatus.refreshing) return '刷新中';
                 if (this.systemStatus.failed > 0) return '部分异常';
                 return '运行正常';
+            },
+            lastRefreshLabel() {
+                const at = Number(this.systemStatus.lastRefreshAt) || 0;
+                if (!at) return '—';
+                const date = new Date(at * 1000);
+                const pad = (value) => String(value).padStart(2, '0');
+                return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
             },
             formattedCountdown() {
                 const seconds = Math.max(0, Number(this.systemStatus.nextRefreshIn) || 0);
@@ -888,11 +904,22 @@
                 this.noticeTimer = window.setTimeout(() => { this.settingsNotice = ''; }, 3000);
             },
             connectWebSocket() {
+                window.clearTimeout(this.reconnectTimer);
                 const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
                 const socket = new WebSocket(protocol + window.location.host + '/ws');
+                this.wsSocket = socket;
 
+                socket.onopen = () => {
+                    this.wsConnected = true;
+                    this.wsRetry = 0;
+                };
                 socket.onmessage = (event) => {
-                    const message = JSON.parse(event.data);
+                    let message;
+                    try {
+                        message = JSON.parse(event.data);
+                    } catch (_) {
+                        return;
+                    }
                     if (message.type === 'status') {
                         this.systemStatus = message;
                     } else if (message.type === 'feeds' && message.data) {
@@ -904,22 +931,45 @@
                     }
                 };
                 socket.onclose = () => {
-                    if (this.autoUpdatePush > 0 && document.visibilityState === 'visible') {
-                        window.clearTimeout(this.reconnectTimer);
-                        this.reconnectTimer = window.setTimeout(() => this.connectWebSocket(), 3000);
+                    this.wsConnected = false;
+                    // 状态推送是基础能力，与 autoUpdatePush 无关，断线后始终恢复。
+                    if (document.visibilityState === 'visible') {
+                        this.scheduleReconnect();
                     }
                 };
+            },
+            scheduleReconnect() {
+                window.clearTimeout(this.reconnectTimer);
+                const delay = Math.min(30000, 1000 * 2 ** this.wsRetry);
+                this.wsRetry += 1;
+                this.reconnectTimer = window.setTimeout(() => {
+                    if (document.visibilityState === 'visible') this.connectWebSocket();
+                }, delay);
+            },
+            handleVisibilityChange() {
+                if (document.visibilityState !== 'visible') return;
+                const socket = this.wsSocket;
+                if (!socket || socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
+                    this.wsRetry = 0;
+                    this.connectWebSocket();
+                }
             },
         },
         mounted() {
             document.addEventListener('keydown', this.closeOnEscape);
+            document.addEventListener('visibilitychange', this.handleVisibilityChange);
             this.connectWebSocket();
         },
         beforeUnmount() {
             document.removeEventListener('keydown', this.closeOnEscape);
+            document.removeEventListener('visibilitychange', this.handleVisibilityChange);
             document.body.classList.remove('settings-open');
             window.clearTimeout(this.reconnectTimer);
             window.clearTimeout(this.noticeTimer);
+            if (this.wsSocket) {
+                this.wsSocket.onclose = null;
+                this.wsSocket.close();
+            }
         },
     });
 
