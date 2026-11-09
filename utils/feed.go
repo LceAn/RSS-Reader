@@ -15,7 +15,10 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
-const feedRequestTimeout = 20 * time.Second
+const (
+	feedRequestTimeout   = 20 * time.Second
+	maxConcurrentFetches = 8
+)
 
 var (
 	feedLogger   = NewLogger("FEED")
@@ -87,11 +90,16 @@ func fetchAllFeeds(ctx context.Context, config models.Config) {
 	var failed int32
 
 	var waitGroup sync.WaitGroup
+	semaphore := make(chan struct{}, maxConcurrentFetches)
 	for _, feedURL := range config.Values {
 		feedURL := feedURL
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
+			// Bound concurrency so a large subscription list cannot exhaust
+			// sockets, memory or the remote servers at once.
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
 			if err := updateFeed(ctx, config, feedURL, formattedTime); err != nil {
 				feedLogger.Warn("Failed to fetch feed host=%s, error=%v", endpointForLog(feedURL), networkError(err))
 				atomic.AddInt32(&failed, 1)
@@ -115,7 +123,9 @@ func updateFeed(ctx context.Context, config models.Config, feedURL, formattedTim
 	}
 
 	cache, cacheExists := globals.GetFeed(feedURL)
-	if cacheExists && len(result.Items) > 0 && len(cache.Items) > 0 && result.Items[0].Link == cache.Items[0].Link {
+	// Only treat the feed as unchanged when both sides have a comparable link:
+	// two empty links would otherwise freeze the cache on stale content.
+	if cacheExists && len(result.Items) > 0 && len(cache.Items) > 0 && result.Items[0].Link != "" && result.Items[0].Link == cache.Items[0].Link {
 		return nil
 	}
 
