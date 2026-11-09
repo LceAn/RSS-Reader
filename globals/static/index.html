@@ -363,6 +363,11 @@
                                 <button class="remove-row" type="button" title="删除订阅源" :aria-label="`删除订阅源 ${index + 1}`" @click="removeFeed(index)">&times;</button>
                             </div>
                             <button class="add-row" type="button" @click="addFeed"><span aria-hidden="true">+</span> 添加订阅源</button>
+                            <div class="opml-actions">
+                                <button class="opml-button" type="button" :disabled="opmlLoading" @click="exportOPML">{{ opmlExporting ? '导出中' : '导出 OPML' }}</button>
+                                <button class="opml-button" type="button" :disabled="opmlLoading" @click="triggerOPMLImport">{{ opmlImporting ? '导入中' : '导入 OPML' }}</button>
+                                <input ref="opmlInput" type="file" accept=".opml,application/xml,text/xml" hidden @change="importOPMLFile">
+                            </div>
                         </div>
                     </section>
 
@@ -432,6 +437,8 @@
                 adminETag: '',
                 saveLoading: false,
                 saveError: '',
+                opmlExporting: false,
+                opmlImporting: false,
                 settingsNotice: '',
                 reconnectTimer: null,
                 noticeTimer: null,
@@ -588,30 +595,34 @@
                     return;
                 }
                 try {
-                    const response = await fetch('/api/admin/config', { cache: 'no-store' });
-                    if (response.status === 401) {
-                        this.adminSession.authenticated = false;
-                        this.csrfToken = '';
-                        this.loginVisible = true;
-                        throw new Error('登录信息已失效');
-                    }
-                    if (!response.ok) throw new Error(await this.responseError(response, '无法读取可编辑配置'));
-                    const data = await response.json();
-                    const editableConfig = {
-                        feeds: Array.isArray(data.feeds) ? [...data.feeds] : [],
-                        keywords: Array.isArray(data.keywords) ? [...data.keywords] : [],
-                        refresh: data.refresh,
-                        autoUpdatePush: data.autoUpdatePush,
-                        listHeight: data.listHeight,
-                        notify: this.normalizeNotificationConfig(data.notify),
-                    };
-                    this.adminConfig = editableConfig;
-                    this.adminOriginal = this.editablePayload(editableConfig);
-                    this.adminETag = response.headers.get('ETag') || '';
+                    await this.fetchEditableConfig();
                     this.editing = true;
                 } catch (error) {
                     this.adminError = error.message || '无法读取可编辑配置';
                 }
+            },
+            async fetchEditableConfig() {
+                const response = await fetch('/api/admin/config', { cache: 'no-store' });
+                if (response.status === 401) {
+                    this.adminSession.authenticated = false;
+                    this.csrfToken = '';
+                    this.editing = false;
+                    this.loginVisible = true;
+                    throw new Error('登录信息已失效');
+                }
+                if (!response.ok) throw new Error(await this.responseError(response, '无法读取可编辑配置'));
+                const data = await response.json();
+                const editableConfig = {
+                    feeds: Array.isArray(data.feeds) ? [...data.feeds] : [],
+                    keywords: Array.isArray(data.keywords) ? [...data.keywords] : [],
+                    refresh: data.refresh,
+                    autoUpdatePush: data.autoUpdatePush,
+                    listHeight: data.listHeight,
+                    notify: this.normalizeNotificationConfig(data.notify),
+                };
+                this.adminConfig = editableConfig;
+                this.adminOriginal = this.editablePayload(editableConfig);
+                this.adminETag = response.headers.get('ETag') || '';
             },
             cancelEditing() {
                 this.leaveEditing();
@@ -644,6 +655,85 @@
             },
             removeFeed(index) {
                 this.adminConfig.feeds.splice(index, 1);
+            },
+            async exportOPML() {
+                if (this.opmlExporting || this.opmlImporting) return;
+                this.opmlExporting = true;
+                this.saveError = '';
+                try {
+                    const response = await fetch('/api/admin/opml', { cache: 'no-store' });
+                    if (response.status === 401) {
+                        this.adminSession.authenticated = false;
+                        this.csrfToken = '';
+                        this.editing = false;
+                        this.loginVisible = true;
+                        throw new Error('登录信息已失效');
+                    }
+                    if (!response.ok) throw new Error(await this.responseError(response, '导出失败'));
+                    const url = URL.createObjectURL(await response.blob());
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'rss-reader.opml';
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    URL.revokeObjectURL(url);
+                } catch (error) {
+                    this.saveError = error.message || '导出失败';
+                } finally {
+                    this.opmlExporting = false;
+                }
+            },
+            triggerOPMLImport() {
+                if (this.opmlExporting || this.opmlImporting) return;
+                if (this.hasAdminChanges) {
+                    this.saveError = '当前有未保存的修改，请先保存或取消再导入';
+                    return;
+                }
+                this.saveError = '';
+                const input = this.$refs.opmlInput;
+                if (input) {
+                    input.value = '';
+                    input.click();
+                }
+            },
+            async importOPMLFile(event) {
+                const file = event.target.files && event.target.files[0];
+                if (!file) return;
+                this.opmlImporting = true;
+                this.saveError = '';
+                try {
+                    if (file.size > 512 * 1024) throw new Error('OPML 文件过大（上限 512KB）');
+                    const response = await fetch('/api/admin/opml', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/xml',
+                            'X-CSRF-Token': this.csrfToken,
+                            'If-Match': this.adminETag,
+                        },
+                        body: await file.text(),
+                    });
+                    if (response.status === 401) {
+                        this.adminSession.authenticated = false;
+                        this.csrfToken = '';
+                        this.editing = false;
+                        this.loginVisible = true;
+                        throw new Error('登录信息已失效');
+                    }
+                    if (!response.ok) throw new Error(await this.responseError(response, '导入失败'));
+                    const result = await response.json();
+                    await this.fetchEditableConfig();
+                    if (result.imported > 0) {
+                        this.showNotice(`已导入 ${result.imported} 个订阅源${result.skipped > 0 ? `，跳过重复 ${result.skipped} 个` : ''}`);
+                    } else {
+                        this.showNotice('没有新增订阅源');
+                    }
+                } catch (error) {
+                    this.saveError = error.message || '导入失败';
+                } finally {
+                    this.opmlImporting = false;
+                    event.target.value = '';
+                }
             },
             focusLastEditorInput(selector) {
                 const panel = document.querySelector('.settings-panel');

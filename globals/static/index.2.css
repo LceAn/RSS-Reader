@@ -924,6 +924,32 @@ a:focus-visible {
     font-size: 0.9rem;
 }
 
+.opml-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 2px;
+}
+
+.opml-button {
+    min-height: 28px;
+    padding: 0 2px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.opml-button:hover {
+    color: var(--text);
+}
+
+.opml-button:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
 .editor-actions {
     position: sticky;
     bottom: 0;
