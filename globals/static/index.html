@@ -77,6 +77,12 @@
             </div>
 
             <section class="feed-grid" aria-label="RSS 订阅列表">
+                << if eq (len .RssDataList) 0 >>
+                <div class="feed-empty-page" v-if="showSEOFlag">
+                    <p class="feed-empty-title">还没有获取到内容</p>
+                    <p class="feed-empty-hint">正在抓取订阅源，或前往设置检查订阅配置。</p>
+                </div>
+                << end >>
                 << $root := . >>
                 << range $index, $feed := .RssDataList >>
                 <article v-if="showSEOFlag" class="feed-card">
@@ -85,13 +91,13 @@
                             <h3><< $feed.Title >></h3>
                             <span class="card-count"><< len $feed.Items >></span>
                         </div>
-                        <time><< $feed.Custom.lastupdate >></time>
+                        <time datetime="<< xmltime $feed.Custom.lastupdate >>"><< $feed.Custom.lastupdate >></time>
                     </header>
                     <div class="feed-scroll" style="--list-height: << $root.ListHeight >>px;">
                         <ul class="feed-items">
                             << range $item := $feed.Items >>
                             <li>
-                                <a href="<< $item.Link >>" target="_blank" rel="noopener noreferrer" title="<< $item.Title >>">
+                                <a href="<< $item.Link >>" target="_blank" rel="noopener noreferrer">
                                     <span><< $item.Title >></span>
                                     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 5h8v8M15 5 5 15"/></svg>
                                 </a>
@@ -109,12 +115,12 @@
                             <h3>{{ feed.title }}</h3>
                             <span class="card-count">{{ feed.items ? feed.items.length : 0 }}</span>
                         </div>
-                        <time>{{ feed.custom && feed.custom.lastupdate ? feed.custom.lastupdate : '刚刚更新' }}</time>
+                        <time :datetime="feed.custom && feed.custom.lastupdate ? feed.custom.lastupdate.replace(' ', 'T') : null">{{ feed.custom && feed.custom.lastupdate ? feed.custom.lastupdate : '刚刚更新' }}</time>
                     </header>
                     <div class="feed-scroll" :style="{ '--list-height': `${listHeight}px` }">
                         <ul class="feed-items">
                             <li v-for="(item, itemIndex) in feed.items" :key="item.link || `${index}-${itemIndex}`">
-                                <a :href="item.link" target="_blank" rel="noopener noreferrer" :title="item.title">
+                                <a :href="item.link" target="_blank" rel="noopener noreferrer">
                                     <span>{{ item.title }}</span>
                                     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 5h8v8M15 5 5 15"/></svg>
                                 </a>
@@ -204,8 +210,12 @@
                     </section>
 
                     <section class="settings-section">
-                        <div class="settings-section-title">
+                        <div class="settings-section-title with-action">
                             <h3>订阅源 <span>{{ config.feeds ? config.feeds.length : 0 }}</span></h3>
+                            <button v-if="adminSession.authenticated" class="opml-button" type="button"
+                                    :disabled="opmlExporting || opmlImporting" @click="exportOPML">
+                                {{ opmlExporting ? '导出中' : '导出 OPML' }}
+                            </button>
                         </div>
                         <ul class="source-list" v-if="config.feeds && config.feeds.length">
                             <li v-for="feed in config.feeds" :key="feed">
@@ -368,10 +378,17 @@
                             </div>
                             <button class="add-row" type="button" @click="addFeed"><span aria-hidden="true">+</span> 添加订阅源</button>
                             <div class="opml-actions">
-                                <button class="opml-button" type="button" :disabled="opmlLoading" @click="exportOPML">{{ opmlExporting ? '导出中' : '导出 OPML' }}</button>
-                                <button class="opml-button" type="button" :disabled="opmlLoading" @click="triggerOPMLImport">{{ opmlImporting ? '导入中' : '导入 OPML' }}</button>
+                                <button class="opml-button" type="button" :disabled="opmlExporting || opmlImporting" @click="exportOPML">{{ opmlExporting ? '导出中' : '导出 OPML' }}</button>
+                                <button class="opml-button" type="button" :disabled="opmlExporting || opmlImporting" @click="triggerOPMLImport">{{ opmlImporting ? '导入中' : '导入 OPML' }}</button>
                                 <input ref="opmlInput" type="file" accept=".opml,application/xml,text/xml" hidden @change="importOPMLFile">
                             </div>
+                            <p class="opml-preview" v-if="opmlPending" role="status">
+                                <span>{{ opmlPending.name }}：共 {{ opmlPending.total }} 个订阅，新增 {{ opmlPending.newCount }} 个，已存在 {{ opmlPending.existingCount }} 个。</span>
+                                <span class="opml-preview-actions">
+                                    <button class="opml-button confirm" type="button" :disabled="opmlImporting" @click="confirmOPMLImport">{{ opmlImporting ? '导入中' : '确认导入' }}</button>
+                                    <button class="opml-button" type="button" :disabled="opmlImporting" @click="opmlPending = null">取消</button>
+                                </span>
+                            </p>
                         </div>
                     </section>
 
@@ -443,6 +460,7 @@
                 saveError: '',
                 opmlExporting: false,
                 opmlImporting: false,
+                opmlPending: null,
                 settingsNotice: '',
                 reconnectTimer: null,
                 noticeTimer: null,
@@ -567,6 +585,10 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ password: this.adminPassword }),
                     });
+                    if (response.status === 429) {
+                        const retryAfter = Number(response.headers.get('Retry-After')) || 0;
+                        throw new Error(retryAfter > 0 ? `尝试次数过多，请 ${retryAfter} 秒后再试` : '尝试次数过多，请稍后再试');
+                    }
                     if (!response.ok) throw new Error(await this.responseError(response, '登录失败'));
                     const session = await response.json();
                     this.adminSession = { enabled: true, authenticated: true };
@@ -620,10 +642,7 @@
             async fetchEditableConfig() {
                 const response = await fetch('/api/admin/config', { cache: 'no-store' });
                 if (response.status === 401) {
-                    this.adminSession.authenticated = false;
-                    this.csrfToken = '';
-                    this.editing = false;
-                    this.loginVisible = true;
+                    this.sessionExpired();
                     throw new Error('登录信息已失效');
                 }
                 if (!response.ok) throw new Error(await this.responseError(response, '无法读取可编辑配置'));
@@ -649,6 +668,11 @@
             leaveEditing() {
                 this.editing = false;
                 this.saveError = '';
+                this.opmlPending = null;
+                this.$nextTick(() => {
+                    const target = document.querySelector('.settings-panel .header-command');
+                    if (target) target.focus();
+                });
             },
             resetAdminView() {
                 this.loginVisible = false;
@@ -675,14 +699,11 @@
             async exportOPML() {
                 if (this.opmlExporting || this.opmlImporting) return;
                 this.opmlExporting = true;
-                this.saveError = '';
+                this.adminError = '';
                 try {
                     const response = await fetch('/api/admin/opml', { cache: 'no-store' });
                     if (response.status === 401) {
-                        this.adminSession.authenticated = false;
-                        this.csrfToken = '';
-                        this.editing = false;
-                        this.loginVisible = true;
+                        this.sessionExpired();
                         throw new Error('登录信息已失效');
                     }
                     if (!response.ok) throw new Error(await this.responseError(response, '导出失败'));
@@ -695,7 +716,7 @@
                     link.remove();
                     URL.revokeObjectURL(url);
                 } catch (error) {
-                    this.saveError = error.message || '导出失败';
+                    this.adminError = error.message || '导出失败';
                 } finally {
                     this.opmlExporting = false;
                 }
@@ -716,10 +737,25 @@
             async importOPMLFile(event) {
                 const file = event.target.files && event.target.files[0];
                 if (!file) return;
-                this.opmlImporting = true;
                 this.saveError = '';
                 try {
                     if (file.size > 512 * 1024) throw new Error('OPML 文件过大（上限 512KB）');
+                    const text = await file.text();
+                    const preview = this.parseOPMLPreview(text);
+                    if (!preview || preview.total === 0) throw new Error('OPML 中没有可识别的订阅，请检查文件格式');
+                    this.opmlPending = { name: file.name, text, ...preview };
+                } catch (error) {
+                    this.saveError = error.message || '无法读取 OPML 文件';
+                } finally {
+                    event.target.value = '';
+                }
+            },
+            async confirmOPMLImport() {
+                const pending = this.opmlPending;
+                if (!pending || this.opmlImporting) return;
+                this.opmlImporting = true;
+                this.saveError = '';
+                try {
                     const response = await fetch('/api/admin/opml', {
                         method: 'POST',
                         headers: {
@@ -727,18 +763,16 @@
                             'X-CSRF-Token': this.csrfToken,
                             'If-Match': this.adminETag,
                         },
-                        body: await file.text(),
+                        body: pending.text,
                     });
                     if (response.status === 401) {
-                        this.adminSession.authenticated = false;
-                        this.csrfToken = '';
-                        this.editing = false;
-                        this.loginVisible = true;
+                        this.sessionExpired();
                         throw new Error('登录信息已失效');
                     }
                     if (!response.ok) throw new Error(await this.responseError(response, '导入失败'));
                     const result = await response.json();
                     await this.fetchEditableConfig();
+                    this.opmlPending = null;
                     if (result.imported > 0) {
                         this.showNotice(`已导入 ${result.imported} 个订阅源${result.skipped > 0 ? `，跳过重复 ${result.skipped} 个` : ''}`);
                     } else {
@@ -748,8 +782,35 @@
                     this.saveError = error.message || '导入失败';
                 } finally {
                     this.opmlImporting = false;
-                    event.target.value = '';
                 }
+            },
+            parseOPMLPreview(text) {
+                let doc;
+                try {
+                    doc = new DOMParser().parseFromString(text, 'application/xml');
+                } catch (_) {
+                    return null;
+                }
+                if (doc.querySelector('parsererror')) return null;
+                const outlines = [...doc.getElementsByTagName('outline')];
+                const current = new Set(this.adminConfig ? this.adminConfig.feeds : []);
+                const seen = new Set();
+                let newCount = 0;
+                let existingCount = 0;
+                for (const outline of outlines) {
+                    const raw = (outline.getAttribute('xmlUrl') || '').trim();
+                    if (!/^https?:\/\//i.test(raw) || seen.has(raw)) continue;
+                    seen.add(raw);
+                    if (current.has(raw)) existingCount += 1;
+                    else newCount += 1;
+                }
+                return { total: seen.size, newCount, existingCount };
+            },
+            sessionExpired() {
+                this.adminSession.authenticated = false;
+                this.csrfToken = '';
+                this.editing = false;
+                this.loginVisible = true;
             },
             focusLastEditorInput(selector) {
                 const panel = document.querySelector('.settings-panel');
@@ -866,10 +927,12 @@
                         body: JSON.stringify(payload),
                     });
                     if (response.status === 401) {
-                        this.adminSession.authenticated = false;
-                        this.csrfToken = '';
-                        this.editing = false;
-                        this.loginVisible = true;
+                        this.sessionExpired();
+                    }
+                    if (response.status === 412) {
+                        // 服务端配置已前进：草稿无法在旧版本上保存，加载最新配置并明确告知。
+                        try { await this.fetchEditableConfig(); } catch (_) { /* 401 已处理 */ }
+                        throw new Error('配置已被其他窗口更新，已还原为最新配置，请重新调整后再保存');
                     }
                     if (!response.ok) throw new Error(await this.responseError(response, '保存失败'));
                     const saved = await response.json();

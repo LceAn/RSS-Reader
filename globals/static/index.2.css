@@ -366,6 +366,21 @@ a:focus-visible {
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+}
+
+.feed-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.feed-scroll::-webkit-scrollbar-thumb {
+    border-radius: 3px;
+    background: var(--border-strong);
+}
+
+.feed-scroll::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .feed-items {
@@ -421,6 +436,27 @@ a:focus-visible {
 .feed-empty {
     margin: 0;
     padding: 18px 16px;
+    color: var(--muted);
+    font-size: 0.76rem;
+}
+
+.feed-empty-page {
+    grid-column: 1 / -1;
+    padding: 72px 16px;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    text-align: center;
+}
+
+.feed-empty-page .feed-empty-title {
+    margin: 0;
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.feed-empty-page .feed-empty-hint {
+    margin: 8px 0 0;
     color: var(--muted);
     font-size: 0.76rem;
 }
@@ -958,6 +994,32 @@ a:focus-visible {
     cursor: default;
 }
 
+.opml-preview {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 10px 0 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-hover);
+    font-size: 0.76rem;
+    color: var(--muted);
+}
+
+.opml-preview-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.opml-button.confirm {
+    color: var(--text);
+    font-weight: 600;
+}
+
 .editor-actions {
     position: sticky;
     bottom: 0;
@@ -973,6 +1035,13 @@ a:focus-visible {
 
 .settings-section-title {
     margin-bottom: 13px;
+}
+
+.settings-section-title.with-action {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
 }
 
 .settings-section-title h3 {

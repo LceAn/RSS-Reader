@@ -118,7 +118,15 @@ const wsWriteTimeout = 10 * time.Second
 // indexTemplate parses once at startup: the page template ships inside the
 // binary and never changes while the process is running.
 var indexTemplate = template.Must(
-	template.New("index.html").Delims("<<", ">>").ParseFS(globals.DirStatic, "static/index.html"),
+	template.New("index.html").Delims("<<", ">>").
+		Funcs(template.FuncMap{
+			// xmltime renders the local "2006-01-02 15:04:05" stamp as an
+			// HTML5 <time datetime> value.
+			"xmltime": func(stamp string) string {
+				return strings.ReplaceAll(stamp, " ", "T")
+			},
+		}).
+		ParseFS(globals.DirStatic, "static/index.html"),
 )
 
 // staticETag changes on every restart so browsers revalidate after an upgrade,
