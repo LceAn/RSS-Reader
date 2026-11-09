@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -94,7 +96,7 @@ func run() error {
 func newHandler(ctx context.Context, admin *adminService) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", tplHandler)
-	mux.Handle("/static/", http.FileServer(http.FS(globals.DirStatic)))
+	mux.Handle("/static/", cacheRevalidator(staticETag, http.FileServer(http.FS(globals.DirStatic))))
 	mux.HandleFunc("/feeds", getFeedsHandler)
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		wsHandler(ctx, w, r)
@@ -109,6 +111,23 @@ func newHandler(ctx context.Context, admin *adminService) *http.ServeMux {
 	return mux
 }
 
+// wsWriteTimeout bounds each websocket frame write so a stalled client cannot
+// block the per-connection push loop forever.
+const wsWriteTimeout = 10 * time.Second
+
+// indexTemplate parses once at startup: the page template ships inside the
+// binary and never changes while the process is running.
+var indexTemplate = template.Must(
+	template.New("index.html").Delims("<<", ">>").ParseFS(globals.DirStatic, "static/index.html"),
+)
+
+// staticETag changes on every restart so browsers revalidate after an upgrade,
+// while revalidation within one process lifetime resolves to 304.
+var staticETag = func() string {
+	summary := sha256.Sum256([]byte(strconv.FormatInt(time.Now().UnixNano(), 10)))
+	return `"` + hex.EncodeToString(summary[:8]) + `"`
+}()
+
 func tplHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
@@ -120,13 +139,6 @@ func tplHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	config := globals.GetConfig()
-	tmplInstance := template.New("index.html").Delims("<<", ">>")
-	tmpl, err := tmplInstance.ParseFS(globals.DirStatic, "static/index.html")
-	if err != nil {
-		utils.NewLogger("SYSTEM").Error("模板加载错误: %v", err)
-		http.Error(w, "Internal Server Error", 500)
-		return
-	}
 
 	data := struct {
 		Keywords                string
@@ -152,8 +164,7 @@ func tplHandler(w http.ResponseWriter, r *http.Request) {
 		Github_author_url_name:  config.Github_author_url_name,
 	}
 
-	err = tmpl.Execute(w, data)
-	if err != nil {
+	if err := indexTemplate.Execute(w, data); err != nil {
 		utils.NewLogger("SYSTEM").Error("模板渲染错误: %v", err)
 	}
 }
@@ -186,9 +197,10 @@ func wsHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 
 	initialFeeds := utils.GetFeeds()
 	if len(initialFeeds) > 0 {
+		_ = conn.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
 		if err := conn.WriteJSON(map[string]interface{}{
 			"type": "feeds",
-			"data": initialFeeds,
+			"data": trimFeeds(initialFeeds),
 		}); err != nil {
 			wsLogger.Warn("Failed to write initial feeds JSON: %v. Closing connection.", err)
 			return
@@ -228,6 +240,7 @@ func wsHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 			LastRefreshAt: fetchStatus.LastRefreshAt,
 			NextRefreshIn: globals.NextRefreshIn(),
 		}
+		_ = conn.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
 		if err := conn.WriteJSON(status); err != nil {
 			wsLogger.Warn("Failed to write status JSON: %v. Closing connection.", err)
 			return
@@ -240,9 +253,10 @@ func wsHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 		if shouldSendInitial || (shouldCheckUpdate && versionChanged) {
 			currentFeeds := utils.GetFeeds()
 			if len(currentFeeds) > 0 && !feedsAreEqual(lastSentFeeds, currentFeeds) {
+				_ = conn.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
 				if err := conn.WriteJSON(map[string]interface{}{
 					"type": "feeds",
-					"data": currentFeeds,
+					"data": trimFeeds(currentFeeds),
 				}); err != nil {
 					wsLogger.Warn("Failed to write feeds JSON: %v. Closing connection.", err)
 					return
@@ -282,6 +296,32 @@ func feedsAreEqual(a, b []models.Feed) bool {
 	return true
 }
 
+// feedItemPayload strips the Description field from the wire format:
+// descriptions can be large and the UI never renders them.
+type feedItemPayload struct {
+	Title string `json:"title"`
+	Link  string `json:"link"`
+}
+
+type feedPayload struct {
+	Title  string            `json:"title,omitempty"`
+	Link   string            `json:"link"`
+	Custom map[string]string `json:"custom,omitempty"`
+	Items  []feedItemPayload `json:"items,omitempty"`
+}
+
+func trimFeeds(feeds []models.Feed) []feedPayload {
+	out := make([]feedPayload, 0, len(feeds))
+	for _, feed := range feeds {
+		items := make([]feedItemPayload, 0, len(feed.Items))
+		for _, item := range feed.Items {
+			items = append(items, feedItemPayload{Title: item.Title, Link: item.Link})
+		}
+		out = append(out, feedPayload{Title: feed.Title, Link: feed.Link, Custom: feed.Custom, Items: items})
+	}
+	return out
+}
+
 func getFeedsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -289,7 +329,8 @@ func getFeedsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	feeds := utils.GetFeeds()
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(feeds); err != nil {
+	w.Header().Set("Cache-Control", "no-store")
+	if err := json.NewEncoder(w).Encode(trimFeeds(feeds)); err != nil {
 		utils.NewLogger("HTTP").Warn("Failed to encode feeds: %v", err)
 	}
 }
@@ -381,6 +422,21 @@ func publicFeedHosts(values []string) []string {
 		hosts = append(hosts, host)
 	}
 	return hosts
+}
+
+// cacheRevalidator serves embedded assets with an ETag that changes on every
+// restart: clients revalidate cheaply (304) instead of caching stale files
+// across upgrades.
+func cacheRevalidator(etag string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Cache-Control", "no-cache")
+		if r.Header.Get("If-None-Match") == etag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func securityHeaders(next http.Handler) http.Handler {
