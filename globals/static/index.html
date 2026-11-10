@@ -210,12 +210,8 @@
                     </section>
 
                     <section class="settings-section">
-                        <div class="settings-section-title with-action">
+                        <div class="settings-section-title">
                             <h3>订阅源 <span>{{ config.feeds ? config.feeds.length : 0 }}</span></h3>
-                            <button v-if="adminSession.authenticated" class="opml-button" type="button"
-                                    :disabled="opmlExporting || opmlImporting" @click="exportOPML">
-                                {{ opmlExporting ? '导出中' : '导出 OPML' }}
-                            </button>
                         </div>
                         <ul class="source-list" v-if="config.feeds && config.feeds.length">
                             <li v-for="feed in config.feeds" :key="feed">

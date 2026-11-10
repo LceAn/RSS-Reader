@@ -1037,13 +1037,6 @@ a:focus-visible {
     margin-bottom: 13px;
 }
 
-.settings-section-title.with-action {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-}
-
 .settings-section-title h3 {
     margin: 0;
     font-size: 0.86rem;
