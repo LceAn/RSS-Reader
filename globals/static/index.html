@@ -73,10 +73,6 @@
         </header>
 
         <main class="feed-main">
-            <div class="section-heading">
-                <h2>最新内容</h2>
-            </div>
-
             <section class="feed-grid" aria-label="RSS 订阅列表">
                 << if eq (len .RssDataList) 0 >>
                 <div class="feed-empty-page" v-if="showSEOFlag">
@@ -88,10 +84,8 @@
                 << range $index, $feed := .RssDataList >>
                 <article v-if="showSEOFlag" class="feed-card">
                     <header class="card-header">
-                        <div class="feed-title-row">
-                            <h3><< $feed.Title >></h3>
-                            <span class="card-count"><< len $feed.Items >></span>
-                        </div>
+                        <h3><< $feed.Title >></h3>
+                        <span class="card-count"><< len $feed.Items >></span>
                         <time datetime="<< xmltime $feed.Custom.lastupdate >>"><< $feed.Custom.lastupdate >></time>
                     </header>
                     <div class="feed-scroll" style="--list-height: << $root.ListHeight >>px;">
@@ -116,10 +110,8 @@
                 </div>
                 <article class="feed-card" v-for="(feed, index) in feeds" :key="feed.link || feed.title || index">
                     <header class="card-header">
-                        <div class="feed-title-row">
-                            <h3>{{ feed.title }}</h3>
-                            <span class="card-count">{{ feed.items ? feed.items.length : 0 }}</span>
-                        </div>
+                        <h3>{{ feed.title }}</h3>
+                        <span class="card-count">{{ feed.items ? feed.items.length : 0 }}</span>
                         <time :datetime="feed.custom && feed.custom.lastupdate ? feed.custom.lastupdate.replace(' ', 'T') : null">{{ feed.custom && feed.custom.lastupdate ? feed.custom.lastupdate : '刚刚更新' }}</time>
                     </header>
                     <div class="feed-scroll" :style="{ '--list-height': `${listHeight}px` }">
