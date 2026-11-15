@@ -108,7 +108,7 @@
                     <p class="feed-empty-title">还没有获取到内容</p>
                     <p class="feed-empty-hint">正在抓取订阅源，或前往设置检查订阅配置。</p>
                 </div>
-                <article class="feed-card" v-for="(feed, index) in feeds" :key="feed.link || feed.title || index">
+                <article class="feed-card" v-for="(feed, index) in pagedFeeds" :key="feed.link || feed.title || index">
                     <header class="card-header">
                         <h3>{{ feed.title }}</h3>
                         <span class="card-count">{{ feed.items ? feed.items.length : 0 }}</span>
@@ -127,6 +127,12 @@
                     </div>
                 </article>
             </section>
+
+            <nav class="feed-pagination" v-if="!showSEOFlag && totalPages > 1" aria-label="订阅分页">
+                <button type="button" :disabled="currentPage === 1" aria-label="上一页" @click="changePage(currentPage - 1)">&lsaquo;</button>
+                <span class="page-indicator">第 {{ currentPage }} / {{ totalPages }} 页</span>
+                <button type="button" :disabled="currentPage === totalPages" aria-label="下一页" @click="changePage(currentPage + 1)">&rsaquo;</button>
+            </nav>
         </main>
     </div>
 
@@ -426,6 +432,8 @@
         data() {
             return {
                 feeds: [],
+                feedPageSize: 6,
+                currentPage: 1,
                 showSEOFlag: true,
                 systemStatus: {
                     totalFeeds: 0,
@@ -515,10 +523,21 @@
                 const remainingSeconds = seconds % 60;
                 return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
             },
+            totalPages() {
+                return Math.max(1, Math.ceil(this.feeds.length / this.feedPageSize));
+            },
+            pagedFeeds() {
+                const start = (this.currentPage - 1) * this.feedPageSize;
+                return this.feeds.slice(start, start + this.feedPageSize);
+            },
         },
         watch: {
             showSettings(open) {
                 document.body.classList.toggle('settings-open', open);
+            },
+            // 订阅列表变化（刷新或配置修改）后，当前页失效时收敛到最后一页。
+            feeds() {
+                if (this.currentPage > this.totalPages) this.currentPage = this.totalPages;
             },
         },
         methods: {
@@ -997,6 +1016,14 @@
                 window.clearTimeout(this.noticeTimer);
                 this.settingsNotice = message;
                 this.noticeTimer = window.setTimeout(() => { this.settingsNotice = ''; }, 3000);
+            },
+            changePage(page) {
+                const target = Math.min(Math.max(1, page), this.totalPages);
+                if (target === this.currentPage) return;
+                this.currentPage = target;
+                this.$nextTick(() => {
+                    document.querySelector('.feed-main')?.scrollIntoView({ block: 'start' });
+                });
             },
             connectWebSocket() {
                 window.clearTimeout(this.reconnectTimer);
