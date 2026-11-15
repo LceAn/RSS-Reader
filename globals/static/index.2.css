@@ -1130,6 +1130,73 @@ a:focus-visible {
     color: var(--success);
 }
 
+.history-list {
+    margin: 0;
+    padding: 0;
+    max-height: 300px;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.history-list li {
+    display: flex;
+    gap: 9px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.history-list li:last-child {
+    border-bottom: 0;
+}
+
+.history-dot {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 auto;
+    margin-top: 6px;
+    border-radius: 50%;
+    background: var(--danger);
+}
+
+.history-dot.ok {
+    background: var(--success);
+}
+
+.history-body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.history-body a,
+.history-title {
+    overflow: hidden;
+    color: var(--text);
+    font-size: 0.74rem;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.history-body a:hover {
+    color: var(--accent);
+}
+
+.history-body small {
+    color: var(--faint);
+    font-size: 0.66rem;
+}
+
+.history-detail {
+    overflow: hidden;
+    color: var(--danger);
+    font-size: 0.66rem;
+    font-style: normal;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .empty-state {
     margin: 0;
     padding: 14px 0;

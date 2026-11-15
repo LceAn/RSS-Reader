@@ -219,6 +219,23 @@
                             <li><span>钉钉</span><strong :class="{ enabled: config.notify && config.notify.dingtalk }">{{ channelStatus(config.notify && config.notify.dingtalk) }}</strong></li>
                         </ul>
                     </section>
+                    <section class="settings-section" v-if="adminSession.authenticated">
+                        <div class="settings-section-title">
+                            <h3>推送历史 <span>{{ history.length }}</span></h3>
+                        </div>
+                        <ul class="history-list" v-if="history.length">
+                            <li v-for="(record, index) in history" :key="index">
+                                <span class="history-dot" :class="{ ok: record.success }" aria-hidden="true"></span>
+                                <div class="history-body">
+                                    <a v-if="record.link" :href="record.link" target="_blank" rel="noopener noreferrer">{{ record.title }}</a>
+                                    <span v-else class="history-title">{{ record.title }}</span>
+                                    <small>{{ record.feed }} · {{ formatHistoryTime(record.time) }}</small>
+                                    <em v-if="record.detail" class="history-detail">{{ record.detail }}</em>
+                                </div>
+                            </li>
+                        </ul>
+                        <p class="empty-state" v-else>暂无推送记录</p>
+                    </section>
                 </template>
 
                 <form v-else class="settings-editor" @submit.prevent="saveAdminConfig">
@@ -446,6 +463,7 @@
                 opmlImporting: false,
                 opmlPending: null,
                 settingsNotice: '',
+                history: [],
                 reconnectTimer: null,
                 noticeTimer: null,
                 wsSocket: null,
@@ -552,6 +570,7 @@
                         authenticated: Boolean(session.authenticated),
                     };
                     this.csrfToken = session.csrfToken || '';
+                    if (this.adminSession.authenticated) this.fetchHistory();
                 } catch (error) {
                     console.error('读取配置失败:', error);
                     this.configError = '配置暂时无法读取，请稍后重试。';
@@ -559,6 +578,22 @@
                     this.configLoading = false;
                     if (this.showSettings) this.$nextTick(() => this.focusSettingsPanel());
                 }
+            },
+            async fetchHistory() {
+                try {
+                    const response = await fetch('/api/admin/history?limit=50', { cache: 'no-store' });
+                    if (!response.ok) return;
+                    const data = await response.json();
+                    this.history = Array.isArray(data.records) ? data.records : [];
+                } catch (_) {
+                    // 推送历史加载失败不打断设置页
+                }
+            },
+            formatHistoryTime(value) {
+                const date = new Date(value);
+                if (Number.isNaN(date.getTime())) return '';
+                const pad = (n) => String(n).padStart(2, '0');
+                return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
             },
             async login() {
                 this.loginLoading = true;
@@ -580,6 +615,7 @@
                     this.adminPassword = '';
                     this.loginVisible = false;
                     await this.startEditing();
+                    this.fetchHistory();
                 } catch (error) {
                     this.loginError = error.message || '登录失败';
                 } finally {

@@ -259,26 +259,54 @@ func checkAndNotify(ctx context.Context, config models.Config, result *gofeed.Fe
 		escapeMarkdownV2URL(item.Link),
 	)
 
+	feedTitle := strings.TrimSpace(result.Title)
+	if feedTitle == "" {
+		feedTitle = endpointForLog(item.Link)
+	}
+
 	dispatchNotification(ctx, func(ctx context.Context) {
-		result := Notify(ctx, Message{
+		notifyResult := Notify(ctx, Message{
 			Routes:   []string{FeiShuRoute, TelegramRoute, DingtalkRoute},
 			Content:  content,
 			FeedItem: *item,
 		})
-		if result.Sent == 0 {
+		globals.AppendNotification(globals.NotificationRecord{
+			Time:    time.Now(),
+			Feed:    feedTitle,
+			Title:   truncateText(item.Title, 200),
+			Link:    link,
+			Success: notifyResult.Sent > 0,
+			Detail:  truncateText(errorText(notifyResult.Err), 400),
+		})
+		if notifyResult.Sent == 0 {
 			globals.ReleaseLink(link)
-			if result.Err != nil {
-				notifyLogger.Error("Notification failed for host=%s: %v", endpointForLog(link), result.Err)
+			if notifyResult.Err != nil {
+				notifyLogger.Error("Notification failed for host=%s: %v", endpointForLog(link), notifyResult.Err)
 			}
 			return
 		}
-		if result.Err != nil {
-			notifyLogger.Warn("Notification partially failed for host=%s: %v", endpointForLog(link), result.Err)
+		if notifyResult.Err != nil {
+			notifyLogger.Warn("Notification partially failed for host=%s: %v", endpointForLog(link), notifyResult.Err)
 		}
 		if err := globals.CommitLink(config.Archives, link); err != nil {
 			notifyLogger.Error("Cannot persist delivered link for host=%s: %v", endpointForLog(link), err)
 		}
 	})
+}
+
+// truncateText 限制历史记录字段的长度，避免异常超长的标题或错误信息撑爆内存与日志文件。
+func truncateText(text string, limit int) string {
+	if len(text) <= limit {
+		return text
+	}
+	return text[:limit] + "…"
+}
+
+func errorText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func canonicalLink(link string) string {

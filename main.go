@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"rss-reader/globals"
 	"rss-reader/models"
 	"rss-reader/utils"
@@ -39,6 +40,8 @@ func run() error {
 	}
 
 	configPath := models.ConfigPath()
+	// 推送历史与归档文件放在同一目录，重启后仍可在管理端查看最近记录。
+	globals.InitNotificationHistory(filepath.Join(filepath.Dir(globals.GetConfig().Archives), "notifications.jsonl"))
 	var background sync.WaitGroup
 	background.Add(2)
 	go func() {
