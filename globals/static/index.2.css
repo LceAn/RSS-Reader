@@ -857,6 +857,39 @@ a:focus-visible {
     font-size: 0.74rem;
 }
 
+.editor-field.proxy-field input {
+    width: min(240px, 52%);
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    background: var(--input-bg);
+    font: inherit;
+    font-size: 0.72rem;
+    text-overflow: ellipsis;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.editor-field.proxy-field input:focus {
+    border-color: var(--accent);
+    outline: 0;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.editor-field.proxy-field input:disabled {
+    color: var(--faint);
+    background: transparent;
+    cursor: not-allowed;
+}
+
+.managed-hint {
+    margin-left: 5px;
+    color: var(--faint);
+    font-size: 0.62rem;
+    font-style: normal;
+}
+
 .locked-setting strong {
     color: var(--text);
     font-weight: 600;

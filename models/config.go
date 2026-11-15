@@ -12,6 +12,7 @@ import (
 
 const (
 	ConfigPathEnvironment = "RSS_READER_CONFIG"
+	ProxyEnvironment      = "RSS_READER_PROXY"
 	DefaultConfigPath     = "config.json"
 )
 
@@ -60,6 +61,7 @@ func ReadConfigFile(path string) (Config, []byte, error) {
 func (c *Config) ApplyEnvironment() error {
 	overrideString(&c.Host, "RSS_READER_HOST")
 	overrideString(&c.Archives, "RSS_READER_ARCHIVES")
+	overrideString(&c.Proxy, ProxyEnvironment)
 	overrideString(&c.Notify.FeiShu.API, "RSS_READER_FEISHU_API")
 	overrideString(&c.Notify.Telegram.API, "RSS_READER_TELEGRAM_API")
 	overrideString(&c.Notify.Telegram.Token, "RSS_READER_TELEGRAM_TOKEN")
@@ -83,6 +85,25 @@ func overrideString(target *string, key string) {
 	}
 }
 
+// ValidateProxy 校验出站代理设置：允许留空（直连），否则必须是带主机名的
+// http/https/socks5/socks5h 地址。
+func ValidateProxy(setting string) error {
+	setting = strings.TrimSpace(setting)
+	if setting == "" {
+		return nil
+	}
+	parsed, err := url.Parse(setting)
+	if err != nil || parsed.Host == "" {
+		return fmt.Errorf("invalid proxy URL %q", setting)
+	}
+	switch parsed.Scheme {
+	case "http", "https", "socks5", "socks5h":
+		return nil
+	default:
+		return fmt.Errorf("unsupported proxy scheme %q (use http, https or socks5)", parsed.Scheme)
+	}
+}
+
 type Config struct {
 	Values []string `json:"values"`
 	Host   string   `json:"host,omitempty"`
@@ -99,10 +120,10 @@ type Config struct {
 	Github_author_url       string `json:"github_author_url"`
 	Github_author_url_name  string `json:"github_author_url_name"`
 
-	Keywords []string `json:"keywords"` // 关键词
-	Notify   Notify   `json:"notify"`   // 通知方式
-	Archives string   `json:"archives"` // 通知方式
-
+	Keywords []string `json:"keywords"`        // 关键词
+	Notify   Notify   `json:"notify"`          // 通知方式
+	Archives string   `json:"archives"`        // 通知方式
+	Proxy    string   `json:"proxy,omitempty"` // 抓取与通知出站代理（http/https/socks5），空为直连
 }
 
 // Normalize applies safe defaults, removes duplicate entries, and validates
@@ -127,6 +148,10 @@ func (c *Config) Normalize() error {
 	if strings.TrimSpace(c.Archives) == "" {
 		c.Archives = "archives.txt"
 	}
+	if err := ValidateProxy(c.Proxy); err != nil {
+		return err
+	}
+	c.Proxy = strings.TrimSpace(c.Proxy)
 
 	seenURLs := make(map[string]struct{}, len(c.Values))
 	values := make([]string, 0, len(c.Values))

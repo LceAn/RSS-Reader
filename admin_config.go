@@ -18,6 +18,7 @@ const (
 	maximumEditableKeywords   = 200
 	maximumFeedURLLength      = 2048
 	maximumKeywordLength      = 128
+	maximumProxyLength        = 512
 	maximumRefreshMinutes     = 10080
 	minimumEditableListHeight = 240
 	maximumEditableListHeight = 1600
@@ -30,6 +31,8 @@ type editableConfig struct {
 	Refresh        int                   `json:"refresh"`
 	AutoUpdatePush int                   `json:"autoUpdatePush"`
 	ListHeight     int                   `json:"listHeight"`
+	Proxy          string                `json:"proxy"`
+	ProxyManaged   bool                  `json:"proxyManaged"`
 	Notify         *editableNotifyConfig `json:"notify,omitempty"`
 }
 
@@ -145,6 +148,10 @@ func (service *adminService) putEditableConfig(w http.ResponseWriter, r *http.Re
 	fileConfig.ReFresh = update.Refresh
 	fileConfig.AutoUpdatePush = update.AutoUpdatePush
 	fileConfig.ListHeight = update.ListHeight
+	// 代理由环境变量托管时忽略网页提交的值，运行时始终以环境变量为准。
+	if !environmentManaged(models.ProxyEnvironment) {
+		fileConfig.Proxy = strings.TrimSpace(update.Proxy)
+	}
 	changes, err := applyNotificationUpdate(&fileConfig, runtimeConfig, update.Notify)
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, err.Error())
@@ -177,6 +184,7 @@ func (service *adminService) putEditableConfig(w http.ResponseWriter, r *http.Re
 	fileConfig.ReFresh = runtimeCandidate.ReFresh
 	fileConfig.AutoUpdatePush = runtimeCandidate.AutoUpdatePush
 	fileConfig.ListHeight = runtimeCandidate.ListHeight
+	fileConfig.Proxy = runtimeCandidate.Proxy
 
 	configPath := models.ConfigPath()
 	if err := models.WriteConfigFileAtomic(configPath, &fileConfig); err != nil {
@@ -223,6 +231,8 @@ func editableConfigFromModel(config models.Config) editableConfig {
 		Refresh:        config.ReFresh,
 		AutoUpdatePush: config.AutoUpdatePush,
 		ListHeight:     config.ListHeight,
+		Proxy:          config.Proxy,
+		ProxyManaged:   environmentManaged(models.ProxyEnvironment),
 		Notify: &editableNotifyConfig{
 			FeiShu: editableFeiShuConfig{
 				Enabled:           feishuEnabled(config.Notify),
@@ -264,6 +274,12 @@ func validateEditableConfig(config editableConfig) error {
 	}
 	if config.ListHeight < minimumEditableListHeight || config.ListHeight > maximumEditableListHeight {
 		return fmt.Errorf("列表高度必须在 %d 到 %d px 之间", minimumEditableListHeight, maximumEditableListHeight)
+	}
+	if len(config.Proxy) > maximumProxyLength {
+		return fmt.Errorf("网络代理不能超过 %d 个字符", maximumProxyLength)
+	}
+	if err := models.ValidateProxy(config.Proxy); err != nil {
+		return err
 	}
 	for _, feedURL := range config.Feeds {
 		if len(feedURL) > maximumFeedURLLength {

@@ -20,17 +20,27 @@ import (
 )
 
 var (
-	notifyLogger           = NewLogger("NOTIFY")
-	notificationHTTPClient = &http.Client{
-		Timeout: 15 * time.Second,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
+	notifyLogger = NewLogger("NOTIFY")
+	// 通知 HTTP 客户端的固定行为：不跟随重定向，直接把 3xx 当作结果校验。
+	notificationTimeout   = 15 * time.Second
 	telegramLimiter       routeLimiter
 	dingtalkLimiter       routeLimiter
 	notificationWaitGroup sync.WaitGroup
 )
+
+// notificationClient 返回使用当前配置代理的通知客户端；重定向策略按引用
+// 拷贝设置，不修改缓存中的共享实例。
+func notificationClient() (*http.Client, error) {
+	client, err := ClientForProxy(globals.GetConfig().Proxy, notificationTimeout)
+	if err != nil {
+		return nil, err
+	}
+	snapshot := *client
+	snapshot.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return &snapshot, nil
+}
 
 const (
 	FeiShuRoute   = "feishu"
@@ -259,8 +269,11 @@ func requestPost(ctx context.Context, endpoint string, param []byte) error {
 		return fmt.Errorf("invalid notification endpoint")
 	}
 	request.Header.Set("Content-Type", ContentType)
-	resp, err := notificationHTTPClient.Do(request)
-
+	client, err := notificationClient()
+	if err != nil {
+		return fmt.Errorf("invalid proxy setting: %w", err)
+	}
+	resp, err := client.Do(request)
 	if err != nil {
 		return fmt.Errorf("HTTP POST request failed: %w", networkError(err))
 	}

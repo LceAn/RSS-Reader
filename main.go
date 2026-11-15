@@ -373,6 +373,7 @@ func handleConfigGet(w http.ResponseWriter, r *http.Request) {
 		Refresh        int          `json:"refresh"`
 		AutoUpdatePush int          `json:"autoUpdatePush"`
 		ListHeight     int          `json:"listHeight"`
+		Proxy          bool         `json:"proxy"`
 		Keywords       []string     `json:"keywords"`
 		Feeds          []string     `json:"feeds"`
 		Notify         notifyStatus `json:"notify"`
@@ -385,6 +386,7 @@ func handleConfigGet(w http.ResponseWriter, r *http.Request) {
 		Refresh:        config.ReFresh,
 		AutoUpdatePush: config.AutoUpdatePush,
 		ListHeight:     config.ListHeight,
+		Proxy:          config.Proxy != "",
 		Keywords:       append(make([]string, 0, len(config.Keywords)), config.Keywords...),
 		Feeds:          publicFeedHosts(config.Values),
 		Notify: notifyStatus{

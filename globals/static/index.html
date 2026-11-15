@@ -180,6 +180,7 @@
                         </div>
                         <dl class="settings-list">
                             <div><dt>监听地址</dt><dd>{{ config.host }}:{{ config.port }}</dd></div>
+                            <div><dt>网络代理</dt><dd>{{ config.proxy ? '已设置' : '直连' }}</dd></div>
                             <div><dt>刷新频率</dt><dd>{{ config.refresh }} 分钟</dd></div>
                             <div><dt>前端推送</dt><dd>{{ config.autoUpdatePush > 0 ? `${config.autoUpdatePush} 分钟` : '已关闭' }}</dd></div>
                             <div><dt>列表高度</dt><dd>{{ config.listHeight }} px</dd></div>
@@ -242,6 +243,7 @@
                     <section class="settings-section editor-section">
                         <div class="settings-section-title"><h3>运行</h3></div>
                         <div class="locked-setting"><span>监听地址</span><strong>{{ config.host }}:{{ config.port }}</strong></div>
+                        <div class="locked-setting"><span>网络代理</span><strong>{{ config.proxy ? '已设置' : '直连' }}</strong></div>
                         <div class="field-list">
                             <label class="editor-field">
                                 <span>刷新频率</span>
@@ -254,6 +256,12 @@
                             <label class="editor-field">
                                 <span>列表高度</span>
                                 <span class="number-field"><input v-model.number="adminConfig.listHeight" type="number" min="240" max="1600" required><em>px</em></span>
+                            </label>
+                            <label class="editor-field proxy-field">
+                                <span>出站代理 <em v-if="adminConfig.proxyManaged" class="managed-hint">环境变量</em></span>
+                                <input v-model="adminConfig.proxy" type="url" maxlength="512" autocomplete="off"
+                                       :disabled="adminConfig.proxyManaged"
+                                       placeholder="http://127.0.0.1:7890，留空直连">
                             </label>
                         </div>
                     </section>
@@ -439,6 +447,7 @@
                     refresh: '—',
                     autoUpdatePush: 0,
                     listHeight: << .ListHeight >>,
+                    proxy: false,
                     keywords: [],
                     feeds: [],
                     notify: {},
@@ -673,6 +682,8 @@
                     refresh: data.refresh,
                     autoUpdatePush: data.autoUpdatePush,
                     listHeight: data.listHeight,
+                    proxy: typeof data.proxy === 'string' ? data.proxy : '',
+                    proxyManaged: Boolean(data.proxyManaged),
                     notify: this.normalizeNotificationConfig(data.notify),
                 };
                 this.adminConfig = editableConfig;
@@ -912,6 +923,7 @@
                     refresh: Number(config.refresh),
                     autoUpdatePush: Number(config.autoUpdatePush),
                     listHeight: Number(config.listHeight),
+                    proxy: String(config.proxy || '').trim(),
                     notify: {
                         feishu: {
                             enabled: Boolean(config.notify.feishu.enabled),

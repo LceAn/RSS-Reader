@@ -103,6 +103,7 @@ go run .
 | `refresh` | number | 后端抓取周期，单位为分钟，必须大于 `0` |
 | `autoUpdatePush` | number | 页面内容检查周期，单位为分钟；`0` 表示关闭后续推送 |
 | `listHeight` | number | 阅读页中每个订阅列表的高度，范围 `240-1600px`；窄屏自动限制为视口高度的 `62%` |
+| `proxy` | string | 抓取与通知的出站代理（`http://`、`https://`、`socks5://`），留空直连；支持热重载，可在管理页修改；`localhost/127.0.0.1` 始终直连 |
 | `keywords` | string[] | 文章标题监听关键词，命中任意一个即进入通知流程 |
 | `notify` | object | Telegram、飞书和钉钉通知配置 |
 | `archives` | string | 已成功通知链接的本地归档路径 |
@@ -119,6 +120,7 @@ go run .
 | --- | --- |
 | `RSS_READER_CONFIG` | 配置文件路径，默认 `config.json` |
 | `RSS_READER_HOST` | 覆盖 `host` |
+| `RSS_READER_PROXY` | 覆盖出站代理；设置后管理页的代理字段变为只读 |
 | `RSS_READER_PORT` | 覆盖 `port` |
 | `RSS_READER_ARCHIVES` | 覆盖归档文件路径 |
 | `RSS_READER_FEISHU_API` | 飞书 Webhook |

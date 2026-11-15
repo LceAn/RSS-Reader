@@ -127,7 +127,14 @@ func updateFeed(ctx context.Context, config models.Config, feedURL, formattedTim
 	requestContext, cancel := context.WithTimeout(ctx, feedRequestTimeout)
 	defer cancel()
 
-	result, err := gofeed.NewParser().ParseURLWithContext(feedURL, requestContext)
+	// 抓取走配置代理；上下文负责整体超时，客户端本身不设超时。
+	client, err := ClientForProxy(config.Proxy, 0)
+	if err != nil {
+		return err
+	}
+	parser := gofeed.NewParser()
+	parser.Client = client
+	result, err := parser.ParseURLWithContext(feedURL, requestContext)
 	if err != nil {
 		return err
 	}
