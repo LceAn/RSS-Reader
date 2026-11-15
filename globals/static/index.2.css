@@ -363,7 +363,8 @@ a:focus-visible {
 }
 
 .feed-scroll {
-    height: clamp(15rem, var(--list-height, 34rem), 100rem);
+    /* 优先用配置高度，但多列布局下压缩到一页 6 张刚好满屏。 */
+    height: min(clamp(15rem, var(--list-height, 34rem), 100rem), var(--fit-list-height, 100rem));
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;

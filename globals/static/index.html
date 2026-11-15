@@ -483,6 +483,7 @@
                 history: [],
                 reconnectTimer: null,
                 noticeTimer: null,
+                fitTimer: null,
                 wsSocket: null,
                 wsRetry: 0,
                 wsConnected: false,
@@ -538,6 +539,7 @@
             // 订阅列表变化（刷新或配置修改）后，当前页失效时收敛到最后一页。
             feeds() {
                 if (this.currentPage > this.totalPages) this.currentPage = this.totalPages;
+                this.scheduleFitListHeight();
             },
         },
         methods: {
@@ -1017,6 +1019,28 @@
                 this.settingsNotice = message;
                 this.noticeTimer = window.setTimeout(() => { this.settingsNotice = ''; }, 3000);
             },
+            // 按视口高度压缩卡片列表，使一页（6 张）刚好铺满一屏。
+            // 只对多列布局生效；窄屏单列保持原有 62vh 规则，页面正常滚动。
+            fitListHeight() {
+                const grid = document.querySelector('.feed-grid');
+                if (!grid || !grid.children.length) return;
+                const columns = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length;
+                const root = document.documentElement;
+                if (columns < 2) {
+                    root.style.removeProperty('--fit-list-height');
+                    return;
+                }
+                const rows = Math.max(1, Math.ceil(this.feedPageSize / columns));
+                const gridTop = Math.max(0, grid.getBoundingClientRect().top);
+                const paginationSpace = 98;
+                const available = window.innerHeight - gridTop - paginationSpace;
+                const listHeight = Math.floor(available / rows) - 48;
+                root.style.setProperty('--fit-list-height', `${Math.max(160, listHeight)}px`);
+            },
+            scheduleFitListHeight() {
+                window.clearTimeout(this.fitTimer);
+                this.fitTimer = window.setTimeout(() => this.fitListHeight(), 150);
+            },
             changePage(page) {
                 const target = Math.min(Math.max(1, page), this.totalPages);
                 if (target === this.currentPage) return;
@@ -1080,14 +1104,18 @@
         mounted() {
             document.addEventListener('keydown', this.closeOnEscape);
             document.addEventListener('visibilitychange', this.handleVisibilityChange);
+            window.addEventListener('resize', this.scheduleFitListHeight);
             this.connectWebSocket();
+            this.$nextTick(() => this.fitListHeight());
         },
         beforeUnmount() {
             document.removeEventListener('keydown', this.closeOnEscape);
             document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+            window.removeEventListener('resize', this.scheduleFitListHeight);
             document.body.classList.remove('settings-open');
             window.clearTimeout(this.reconnectTimer);
             window.clearTimeout(this.noticeTimer);
+            window.clearTimeout(this.fitTimer);
             if (this.wsSocket) {
                 this.wsSocket.onclose = null;
                 this.wsSocket.close();
