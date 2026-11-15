@@ -106,8 +106,8 @@ go run .
 | `keywords` | string[] | 文章标题监听关键词，命中任意一个即进入通知流程 |
 | `notify` | object | Telegram、飞书和钉钉通知配置 |
 | `archives` | string | 已成功通知链接的本地归档路径 |
-| `webTitle` / `webDes` | string | 页面标题与描述 |
-| `github_*` | string | 页脚项目与作者链接 |
+| `webTitle` / `webDes` | string | 浏览器标签页标题与页面描述（页面上不再显示大标题） |
+| `github_*` | string | 已废弃：页面不再展示页脚链接，字段仅为兼容旧配置保留 |
 
 `host` 和 `port` 的修改需要重启服务，其余常用字段支持热重载。保存的新配置必须通过完整校验，否则不会替换当前运行配置。
 

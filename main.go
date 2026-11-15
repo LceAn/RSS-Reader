@@ -149,27 +149,19 @@ func tplHandler(w http.ResponseWriter, r *http.Request) {
 	config := globals.GetConfig()
 
 	data := struct {
-		Keywords                string
-		RssDataList             []models.Feed
-		AutoUpdatePush          int
-		ListHeight              int
-		WebTitle                string
-		WebDes                  string
-		Github_project_url      string
-		Github_project_url_name string
-		Github_author_url       string
-		Github_author_url_name  string
+		Keywords       string
+		RssDataList    []models.Feed
+		AutoUpdatePush int
+		ListHeight     int
+		WebTitle       string
+		WebDes         string
 	}{
-		Keywords:                getKeywords(),
-		RssDataList:             utils.GetFeeds(),
-		AutoUpdatePush:          config.AutoUpdatePush,
-		ListHeight:              config.ListHeight,
-		WebTitle:                config.WebTitle,
-		WebDes:                  config.WebDes,
-		Github_project_url:      config.Github_project_url,
-		Github_project_url_name: config.Github_project_url_name,
-		Github_author_url:       config.Github_author_url,
-		Github_author_url_name:  config.Github_author_url_name,
+		Keywords:       getKeywords(),
+		RssDataList:    utils.GetFeeds(),
+		AutoUpdatePush: config.AutoUpdatePush,
+		ListHeight:     config.ListHeight,
+		WebTitle:       config.WebTitle,
+		WebDes:         config.WebDes,
 	}
 
 	if err := indexTemplate.Execute(w, data); err != nil {

@@ -113,18 +113,6 @@ a:focus-visible {
     stroke-linecap: round;
 }
 
-.brand-block h1 {
-    max-width: 38vw;
-    margin: 0;
-    overflow: hidden;
-    color: var(--muted);
-    font-size: 0.82rem;
-    font-weight: 600;
-    letter-spacing: 0;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .header-actions {
     position: relative;
     flex: 0 0 auto;
@@ -459,37 +447,6 @@ a:focus-visible {
     margin: 8px 0 0;
     color: var(--muted);
     font-size: 0.76rem;
-}
-
-.site-footer {
-    margin-top: 28px;
-    padding-top: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
-    border-top: 1px solid var(--border);
-    color: var(--faint);
-    font-size: 0.7rem;
-}
-
-.site-footer > div,
-.site-footer nav {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 14px;
-}
-
-.site-footer a {
-    color: var(--muted);
-    text-decoration: none;
-    overflow-wrap: anywhere;
-}
-
-.site-footer a:hover {
-    color: var(--text);
 }
 
 .settings-backdrop {
