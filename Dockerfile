@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.26-alpine AS build
+FROM golang:1.27-alpine AS build
 WORKDIR /src
 
 # 国内网络可用 --build-arg GOPROXY=https://goproxy.cn,direct 加速模块下载。

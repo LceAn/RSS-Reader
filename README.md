@@ -5,7 +5,7 @@
 轻量、自托管的 RSS 聚合与关键词通知服务
 
 [![CI](https://github.com/LceAn/RSS-Reader/actions/workflows/ci.yml/badge.svg)](https://github.com/LceAn/RSS-Reader/actions/workflows/ci.yml)
-[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 [![License](https://img.shields.io/badge/License-MIT-2f855a.svg)](LICENSE)
 
@@ -39,7 +39,7 @@ curl -b cookies.txt -H "X-CSRF-Token: $CSRF" -H "If-Match: $ETAG"   --data-binar
 
 ## 快速开始
 
-需要 Go 1.26 或更高版本。
+需要 Go 1.27 或更高版本。
 
 ```bash
 git clone https://github.com/LceAn/RSS-Reader.git
