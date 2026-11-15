@@ -1,6 +1,6 @@
 :root {
     color-scheme: light;
-    --page: #f6f6f5;
+    --page: #f1f1f6;
     --surface: #ffffff;
     --surface-hover: #f7f7f7;
     --text: #202124;
@@ -13,12 +13,21 @@
     --warning: #c17b16;
     --danger: #c2414f;
     --font: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    /* 液态玻璃 */
+    --glass-blur: 18px;
+    --glass-bg: rgba(255, 255, 255, 0.58);
+    --glass-bg-strong: rgba(255, 255, 255, 0.76);
+    --glass-border: rgba(255, 255, 255, 0.62);
+    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    --glass-shadow: 0 10px 30px rgba(28, 24, 60, 0.10), 0 2px 8px rgba(28, 24, 60, 0.05);
+    --input-bg: rgba(255, 255, 255, 0.55);
+    --hover-veil: rgba(28, 24, 60, 0.05);
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
         color-scheme: dark;
-        --page: #111113;
+        --page: #0e0e13;
         --surface: #19191c;
         --surface-hover: #202024;
         --text: #ededee;
@@ -30,6 +39,14 @@
         --success: #4eb58e;
         --warning: #dfaa58;
         --danger: #e57782;
+        /* 液态玻璃（暗色） */
+        --glass-bg: rgba(26, 26, 32, 0.55);
+        --glass-bg-strong: rgba(23, 23, 28, 0.8);
+        --glass-border: rgba(255, 255, 255, 0.09);
+        --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+        --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.22);
+        --input-bg: rgba(255, 255, 255, 0.06);
+        --hover-veil: rgba(255, 255, 255, 0.07);
     }
 }
 
@@ -43,7 +60,7 @@ html {
 
 body {
     color: var(--text);
-    background: var(--page);
+    background: transparent;
     font-family: var(--font);
     font-size: 16px;
     line-height: 1.5;
@@ -78,14 +95,22 @@ a:focus-visible {
 }
 
 .site-header {
-    min-height: 42px;
+    position: sticky;
+    top: 10px;
+    z-index: 60;
+    min-height: 54px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 20px;
-    padding: 0 0 16px;
+    padding: 9px 12px 9px 16px;
     margin-bottom: 26px;
-    border-bottom: 1px solid var(--border);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.5);
+    backdrop-filter: blur(var(--glass-blur)) saturate(1.5);
+    box-shadow: var(--glass-highlight), var(--glass-shadow);
 }
 
 .brand-block {
@@ -133,7 +158,7 @@ a:focus-visible {
     gap: 7px;
     padding: 0 9px;
     border: 0;
-    border-radius: 7px;
+    border-radius: 9px;
     color: var(--muted);
     background: transparent;
     cursor: pointer;
@@ -142,12 +167,12 @@ a:focus-visible {
 
 .icon-button:hover {
     color: var(--text);
-    background: var(--surface-hover);
+    background: var(--hover-veil);
 }
 
 .status-button[aria-expanded="true"] {
     color: var(--text);
-    background: var(--surface-hover);
+    background: var(--hover-veil);
 }
 
 .icon-button > svg {
@@ -186,15 +211,17 @@ a:focus-visible {
 
 .status-popup {
     position: absolute;
-    top: calc(100% + 8px);
+    top: calc(100% + 10px);
     right: 0;
     z-index: 80;
     width: min(290px, calc(100vw - 28px));
     padding: 18px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    background: var(--glass-bg-strong);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    backdrop-filter: blur(24px) saturate(1.5);
+    box-shadow: var(--glass-highlight), 0 16px 44px rgba(28, 24, 60, 0.18);
     transform-origin: top right;
 }
 
@@ -285,14 +312,18 @@ a:focus-visible {
 .feed-card {
     min-width: 0;
     overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-    transition: border-color 140ms ease;
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+    backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+    box-shadow: var(--glass-highlight), var(--glass-shadow);
+    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
 }
 
 .feed-card:hover {
-    border-color: var(--border-strong);
+    transform: translateY(-2px);
+    box-shadow: var(--glass-highlight), 0 16px 42px rgba(28, 24, 60, 0.16), 0 3px 10px rgba(28, 24, 60, 0.07);
 }
 
 .card-header {
@@ -393,7 +424,7 @@ a:focus-visible {
 
 .feed-items a:hover {
     color: var(--accent);
-    background: var(--surface-hover);
+    background: var(--hover-veil);
 }
 
 .feed-items a:focus-visible {
@@ -414,8 +445,12 @@ a:focus-visible {
 .feed-empty-page {
     grid-column: 1 / -1;
     padding: 72px 16px;
-    border: 1px dashed var(--border);
-    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+    backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+    box-shadow: var(--glass-highlight), var(--glass-shadow);
     text-align: center;
 }
 
@@ -440,7 +475,9 @@ a:focus-visible {
     height: 100%;
     padding: 0;
     border: 0;
-    background: rgba(0, 0, 0, 0.28);
+    background: rgba(10, 10, 16, 0.3);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
 }
 
 .settings-panel {
@@ -453,9 +490,11 @@ a:focus-visible {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    border-left: 1px solid var(--border);
-    background: var(--surface);
-    box-shadow: -12px 0 36px rgba(0, 0, 0, 0.12);
+    border-left: 1px solid var(--glass-border);
+    background: var(--glass-bg-strong);
+    -webkit-backdrop-filter: blur(28px) saturate(1.4);
+    backdrop-filter: blur(28px) saturate(1.4);
+    box-shadow: var(--glass-highlight), -24px 0 60px rgba(10, 8, 30, 0.24);
     outline: 0;
 }
 
@@ -483,10 +522,11 @@ a:focus-visible {
 }
 
 .access-state {
-    padding: 2px 6px;
+    padding: 2px 7px;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 99px;
     color: var(--faint);
+    background: var(--input-bg);
     font-size: 0.64rem;
     font-weight: 600;
 }
@@ -513,7 +553,7 @@ a:focus-visible {
 }
 
 .header-command:hover {
-    background: var(--surface-hover);
+    background: var(--hover-veil);
 }
 
 .close-btn {
@@ -532,7 +572,7 @@ a:focus-visible {
 
 .close-btn:hover {
     color: var(--text);
-    background: var(--surface-hover);
+    background: var(--hover-veil);
 }
 
 .close-btn svg {
@@ -591,11 +631,12 @@ a:focus-visible {
     height: 36px;
     padding: 0 10px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 8px;
     color: var(--text);
-    background: var(--surface);
+    background: var(--input-bg);
     font: inherit;
     font-size: 0.76rem;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
 .login-row input:focus,
@@ -603,8 +644,8 @@ a:focus-visible {
 .credential-field input:focus,
 .number-field:focus-within {
     border-color: var(--accent);
-    outline: 1px solid var(--accent);
-    outline-offset: 0;
+    outline: 0;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .primary-action,
@@ -623,12 +664,13 @@ a:focus-visible {
     border-color: var(--text);
     color: var(--surface);
     background: var(--text);
+    box-shadow: 0 6px 18px rgba(28, 24, 60, 0.22);
 }
 
 .secondary-action,
 .add-row {
     color: var(--text);
-    background: transparent;
+    background: var(--input-bg);
 }
 
 .primary-action:disabled,
@@ -728,7 +770,7 @@ a:focus-visible {
     inset: 0;
     border: 1px solid var(--border-strong);
     border-radius: 10px;
-    background: var(--surface-hover);
+    background: var(--input-bg);
     transition: border-color 140ms ease, background-color 140ms ease;
 }
 
@@ -799,7 +841,7 @@ a:focus-visible {
 
 .credential-field input:disabled {
     color: var(--faint);
-    background: var(--surface-hover);
+    background: transparent;
     cursor: not-allowed;
 }
 
@@ -832,9 +874,10 @@ a:focus-visible {
     align-items: center;
     overflow: hidden;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 8px;
     color: var(--muted);
-    background: var(--surface);
+    background: var(--input-bg);
+    transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
 .number-field input {
@@ -943,8 +986,8 @@ a:focus-visible {
     margin: 10px 0 0;
     padding: 10px 12px;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--surface-hover);
+    border-radius: 8px;
+    background: var(--input-bg);
     font-size: 0.76rem;
     color: var(--muted);
 }
@@ -970,7 +1013,9 @@ a:focus-visible {
     justify-content: flex-end;
     gap: 8px;
     border-top: 1px solid var(--border);
-    background: var(--surface);
+    background: var(--glass-bg-strong);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    backdrop-filter: blur(20px) saturate(1.4);
 }
 
 .settings-section-title {
@@ -1025,11 +1070,11 @@ a:focus-visible {
 }
 
 .keyword-tag {
-    padding: 4px 8px;
+    padding: 4px 9px;
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: 99px;
     color: var(--text);
-    background: transparent;
+    background: var(--input-bg);
     font-size: 0.7rem;
 }
 
@@ -1118,10 +1163,25 @@ a:focus-visible {
 .panel-error button {
     padding: 7px 10px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 8px;
     color: var(--text);
-    background: transparent;
+    background: var(--input-bg);
     cursor: pointer;
+}
+
+/* 不支持 backdrop-filter 的环境：提高玻璃底透明度，保证可读性。 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    :root {
+        --glass-bg: rgba(255, 255, 255, 0.93);
+        --glass-bg-strong: rgba(255, 255, 255, 0.97);
+    }
+
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --glass-bg: rgba(26, 26, 32, 0.95);
+            --glass-bg-strong: rgba(23, 23, 28, 0.98);
+        }
+    }
 }
 
 ::-webkit-scrollbar {

@@ -1,0 +1,90 @@
+/* 液态玻璃背景：底色之上两团缓慢漂移的柔光，为磨砂玻璃卡片提供层次。 */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    min-height: 100%;
+}
+
+html {
+    background: #f1f1f6;
+}
+
+body {
+    min-height: 100vh;
+    margin: 0;
+    background:
+        radial-gradient(1100px 700px at 72% -12%, rgba(214, 96, 156, 0.09), transparent 62%),
+        transparent;
+}
+
+/* 两团柔光：大面积、低强度、缓慢漂移，仅用 transform 动画保持 GPU 合成。 */
+body::before,
+body::after {
+    content: "";
+    position: fixed;
+    z-index: -1;
+    border-radius: 50%;
+    filter: blur(72px);
+    pointer-events: none;
+}
+
+body::before {
+    width: 46vmax;
+    height: 46vmax;
+    top: -14vmax;
+    left: -10vmax;
+    background: radial-gradient(circle at 30% 30%, rgba(86, 83, 215, 0.32), rgba(86, 83, 215, 0) 70%);
+    animation: liquid-drift-a 44s ease-in-out infinite alternate;
+}
+
+body::after {
+    width: 40vmax;
+    height: 40vmax;
+    right: -12vmax;
+    bottom: -16vmax;
+    background: radial-gradient(circle at 60% 40%, rgba(18, 148, 148, 0.24), rgba(18, 148, 148, 0) 70%);
+    animation: liquid-drift-b 38s ease-in-out infinite alternate;
+}
+
+@keyframes liquid-drift-a {
+    from { transform: translate3d(0, 0, 0) scale(1); }
+    to   { transform: translate3d(9vmax, 6vmax, 0) scale(1.12); }
+}
+
+@keyframes liquid-drift-b {
+    from { transform: translate3d(0, 0, 0) scale(1.08); }
+    to   { transform: translate3d(-8vmax, -5vmax, 0) scale(1); }
+}
+
+@media (prefers-color-scheme: dark) {
+    html {
+        background: #0e0e13;
+    }
+
+    body {
+        background:
+            radial-gradient(1100px 700px at 72% -12%, rgba(160, 80, 190, 0.10), transparent 62%),
+            transparent;
+    }
+
+    body::before {
+        background: radial-gradient(circle at 30% 30%, rgba(112, 90, 220, 0.36), rgba(112, 90, 220, 0) 70%);
+    }
+
+    body::after {
+        background: radial-gradient(circle at 60% 40%, rgba(16, 130, 140, 0.28), rgba(16, 130, 140, 0) 70%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body::before,
+    body::after {
+        animation: none;
+    }
+}
