@@ -3,6 +3,10 @@
 FROM golang:1.25-alpine AS build
 WORKDIR /src
 
+# 国内网络可用 --build-arg GOPROXY=https://goproxy.cn,direct 加速模块下载。
+ARG GOPROXY=https://proxy.golang.org,direct
+ENV GOPROXY=${GOPROXY}
+
 COPY go.mod go.sum ./
 RUN go mod download
 

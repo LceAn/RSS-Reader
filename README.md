@@ -154,13 +154,32 @@ go run .
 
 ## Docker 部署
 
+### 直接使用已发布镜像（推荐）
+
+多架构镜像（amd64/arm64）由 GitHub Actions 自动构建并发布到 GHCR，`main` 分支每次推送都会更新：
+
+```bash
+docker run -d --name rss-reader \
+  -p 8080:8080 \
+  -e RSS_READER_ADMIN_PASSWORD='replace-with-a-strong-password' \
+  -v rss-reader-data:/app/data \
+  ghcr.io/lcean/rss-reader:latest
+```
+
+容器首次启动会以内置示例配置为种子；打开 `http://127.0.0.1:8080`，登录管理页即可添加订阅、关键词、通知渠道和出站代理，全部改动保存在 `rss-reader-data` 卷中，重启不丢。
+
+- 镜像标签：`latest`（默认分支最新）、`main`（同 latest）、`vX.Y.Z`（发布 tag）
+- 需要代理出站时，网页管理页配置 `proxy`（如 `http://host.docker.internal:7890`），或启动时加 `-e RSS_READER_PROXY=...`
+
+### 从源码构建（compose）
+
 ```bash
 cp config.example.json config.json
 export RSS_READER_ADMIN_PASSWORD='replace-with-a-strong-password'
-docker compose up --build -d
+docker compose up -d
 ```
 
-Compose 只把服务映射到宿主机的 `127.0.0.1:8080`。容器使用非 root 用户运行，本地 `config.json` 仅在命名卷首次创建时作为配置种子；网页保存后的配置和归档数据都保存在 `rss-reader-data` 卷中。
+Compose 只把服务映射到宿主机的 `127.0.0.1:8080`。容器使用非 root 用户运行，本地 `config.json` 仅在命名卷首次创建时作为配置种子；网页保存后的配置和归档数据都保存在 `rss-reader-data` 卷中。国内网络构建可加代理参数：`docker compose build --build-arg GOPROXY=https://goproxy.cn,direct`。
 
 ```bash
 docker compose logs -f

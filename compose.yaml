@@ -1,5 +1,7 @@
 services:
   rss-reader:
+    # 优先使用已发布镜像；从源码构建：docker compose build --no-cache
+    image: ghcr.io/lcean/rss-reader:latest
     build: .
     restart: unless-stopped
     ports:
@@ -10,6 +12,8 @@ services:
       RSS_READER_CONFIG_SEED: /app/config.seed.json
       RSS_READER_ARCHIVES: /app/data/archives.txt
       RSS_READER_ADMIN_PASSWORD: ${RSS_READER_ADMIN_PASSWORD:-}
+      # 出站代理也可以在网页管理页配置（config.proxy），二选一即可
+      # RSS_READER_PROXY: http://host.docker.internal:7890
     volumes:
       - ./config.json:/app/config.seed.json:ro
       - rss-reader-data:/app/data
