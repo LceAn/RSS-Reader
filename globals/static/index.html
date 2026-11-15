@@ -48,6 +48,10 @@
                                 <div><dt>失败</dt><dd :class="{ 'has-error': systemStatus.failed > 0 }">{{ systemStatus.failed }}</dd></div>
                                 <div><dt>任务</dt><dd>{{ systemStatus.refreshing ? '刷新中' : '空闲' }}</dd></div>
                             </dl>
+                            <div class="countdown-row" v-if="systemStatus.skipped > 0">
+                                <span>连续失败退避</span>
+                                <strong>{{ systemStatus.skipped }} 个源降频重试</strong>
+                            </div>
                             <div class="countdown-row">
                                 <span>上次刷新</span>
                                 <strong>{{ lastRefreshLabel }}</strong>
@@ -109,6 +113,10 @@
                 </article>
                 << end >>
 
+                <div class="feed-empty-page" v-if="!showSEOFlag && (!feeds || !feeds.length)">
+                    <p class="feed-empty-title">还没有获取到内容</p>
+                    <p class="feed-empty-hint">正在抓取订阅源，或前往设置检查订阅配置。</p>
+                </div>
                 <article class="feed-card" v-for="(feed, index) in feeds" :key="feed.link || feed.title || index">
                     <header class="card-header">
                         <div class="feed-title-row">
@@ -419,6 +427,7 @@
                     totalFeeds: 0,
                     successful: 0,
                     failed: 0,
+                    skipped: 0,
                     refreshing: false,
                     nextRefreshIn: 0,
                 },

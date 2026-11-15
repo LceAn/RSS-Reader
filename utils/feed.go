@@ -86,13 +86,21 @@ func UpdateFeeds(ctx context.Context) {
 func fetchAllFeeds(ctx context.Context, config models.Config) {
 	globals.BeginFetchCycle()
 	formattedTime := time.Now().Format("2006-01-02 15:04:05")
+	now := time.Now()
+	refreshInterval := time.Duration(config.ReFresh) * time.Minute
 	var successful int32
 	var failed int32
+	var skipped int32
 
 	var waitGroup sync.WaitGroup
 	semaphore := make(chan struct{}, maxConcurrentFetches)
 	for _, feedURL := range config.Values {
 		feedURL := feedURL
+		// 连续失败的源处于退避期：本轮跳过，减少对不可达主机的无效请求。
+		if !globals.ShouldFetch(feedURL, now) {
+			atomic.AddInt32(&skipped, 1)
+			continue
+		}
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
@@ -102,14 +110,16 @@ func fetchAllFeeds(ctx context.Context, config models.Config) {
 			defer func() { <-semaphore }()
 			if err := updateFeed(ctx, config, feedURL, formattedTime); err != nil {
 				feedLogger.Warn("Failed to fetch feed host=%s, error=%v", endpointForLog(feedURL), networkError(err))
+				globals.RecordFetchFailure(feedURL, refreshInterval, time.Now())
 				atomic.AddInt32(&failed, 1)
 				return
 			}
+			globals.RecordFetchSuccess(feedURL)
 			atomic.AddInt32(&successful, 1)
 		}()
 	}
 	waitGroup.Wait()
-	globals.FinishFetchCycle(int(successful), int(failed))
+	globals.FinishFetchCycle(int(successful), int(failed), int(skipped))
 }
 
 func updateFeed(ctx context.Context, config models.Config, feedURL, formattedTime string) error {

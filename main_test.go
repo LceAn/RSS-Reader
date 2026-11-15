@@ -90,7 +90,7 @@ func TestHealthAndReadyEndpoints(t *testing.T) {
 		t.Fatalf("health status = %d, want 200", healthRecorder.Code)
 	}
 
-	globals.FinishFetchCycle(0, 0)
+	globals.FinishFetchCycle(0, 0, 0)
 	readyRecorder := httptest.NewRecorder()
 	handler.ServeHTTP(readyRecorder, httptest.NewRequest(http.MethodGet, "/readyz", nil))
 	if readyRecorder.Code != http.StatusOK {

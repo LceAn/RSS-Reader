@@ -178,18 +178,8 @@ func tplHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getKeywords() string {
-	var words []string
 	config := globals.GetConfig()
-	for _, url := range config.Values {
-		cache, ok := globals.GetFeed(url)
-		if !ok {
-			continue
-		}
-		if cache.Title != "" {
-			words = append(words, cache.Title)
-		}
-	}
-	return strings.Join(words, ",")
+	return strings.Join(config.Keywords, ",")
 }
 
 func wsHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) {
@@ -244,6 +234,7 @@ func wsHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 			TotalFeeds:    totalFeeds,
 			Successful:    fetchStatus.Successful,
 			Failed:        fetchStatus.Failed,
+			Skipped:       fetchStatus.Skipped,
 			Refreshing:    fetchStatus.Refreshing,
 			LastRefreshAt: fetchStatus.LastRefreshAt,
 			NextRefreshIn: globals.NextRefreshIn(),

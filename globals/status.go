@@ -13,6 +13,7 @@ type SystemStatus struct {
 	TotalFeeds    int    `json:"totalFeeds"`
 	Successful    int    `json:"successful"`
 	Failed        int    `json:"failed"`
+	Skipped       int    `json:"skipped,omitempty"` // 本轮因连续失败退避而跳过的订阅源
 	Refreshing    bool   `json:"refreshing"`
 	LastRefreshAt int64  `json:"lastRefreshAt,omitempty"`
 	NextRefreshIn int    `json:"nextRefreshIn"` // 倒计时，单位：秒
@@ -21,6 +22,7 @@ type SystemStatus struct {
 type FetchSnapshot struct {
 	Successful    int
 	Failed        int
+	Skipped       int
 	Refreshing    bool
 	Completed     bool
 	LastRefreshAt int64
@@ -29,6 +31,7 @@ type FetchSnapshot struct {
 var (
 	successfulFeedCount int32
 	failedFeedCount     int32
+	skippedFeedCount    int32
 	refreshing          int32
 	fetchCompleted      int32
 	lastRefreshUnix     int64
@@ -39,9 +42,10 @@ func BeginFetchCycle() {
 	atomic.StoreInt32(&refreshing, 1)
 }
 
-func FinishFetchCycle(successful, failed int) {
+func FinishFetchCycle(successful, failed, skipped int) {
 	atomic.StoreInt32(&successfulFeedCount, int32(successful))
 	atomic.StoreInt32(&failedFeedCount, int32(failed))
+	atomic.StoreInt32(&skippedFeedCount, int32(skipped))
 	atomic.StoreInt64(&lastRefreshUnix, time.Now().Unix())
 	atomic.StoreInt32(&fetchCompleted, 1)
 	atomic.StoreInt32(&refreshing, 0)
@@ -51,6 +55,7 @@ func GetFetchSnapshot() FetchSnapshot {
 	return FetchSnapshot{
 		Successful:    int(atomic.LoadInt32(&successfulFeedCount)),
 		Failed:        int(atomic.LoadInt32(&failedFeedCount)),
+		Skipped:       int(atomic.LoadInt32(&skippedFeedCount)),
 		Refreshing:    atomic.LoadInt32(&refreshing) == 1,
 		Completed:     atomic.LoadInt32(&fetchCompleted) == 1,
 		LastRefreshAt: atomic.LoadInt64(&lastRefreshUnix),

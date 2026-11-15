@@ -84,6 +84,9 @@ func ReloadConfig() error {
 	}
 	archiveMu.Unlock()
 
+	// 配置已变化：清空失败退避，让新增/修改的订阅立即按正常节奏参与抓取。
+	ResetFeedBackoff()
+
 	return nil
 }
 
